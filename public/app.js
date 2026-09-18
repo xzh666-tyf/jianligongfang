@@ -485,6 +485,7 @@ function renderEditor() {
       <button class="del" data-act="itemdel" data-k="extra" data-i="${i}">删</button></div>`).join('');
   out.push(`<fieldset><legend>基本信息</legend>${FIELDS.base.map((row) =>
     `<div class="grid2">${row.map((i) => fieldHTML(i, 'base')).join('')}</div>`).join('')}
+    <div class="row" style="justify-content:flex-end;margin-top:2px"><button class="mini" data-act="guide">💡 按求职意向给填写思路</button></div>
     <div class="famlabel">对外分享</div>
     <label class="toggle"><input type="checkbox" data-p="#theme.mask" ${r.theme.mask ? 'checked' : ''}/> 脱敏模式：手机号中间四位与邮箱打码，隐藏出生、户籍、身高体重、驾照</label>
     <div class="famlabel">语言</div>
@@ -1467,6 +1468,7 @@ function bind() {
     else if (act === 'photo') { $('#filePhoto').click(); return; }
     else if (act === 'photodel') { d.base.photo = ''; }
     else if (act === 'ai') { openAiFor(b.dataset.p, b.dataset.field); return; }
+    else if (act === 'guide') { openGuide(); return; }
     renderEditor(); renderPreview(); renderSuggestions(); markDirty();
   });
 
@@ -1552,10 +1554,20 @@ function bind() {
     $('#aiMask').classList.add('on');
     aiRunNow();
   }
+  function openGuide() {
+    const r = curResume(); if (!r) return toast('先新建一份简历', true);
+    aiCtx.p = ''; aiCtx.field = 'guide'; aiCtx.mode = 'guide';
+    $$('#aiModes button').forEach((x) => x.classList.toggle('on', x.dataset.mode === 'guide'));
+    $('#aiEditText').hidden = true; $('#aiApply').hidden = true;
+    $('#aiSource').textContent = '按你的求职意向生成';
+    $('#aiResult').innerHTML = '<p class="fine">正在打开…</p>';
+    $('#aiMask').classList.add('on');
+    aiRunNow();
+  }
   async function aiRunNow() {
     const r = curResume(); if (!r) return;
     const mode = aiCtx.mode;
-    const text = mode === 'expand' ? '' : String(getPath(r.data, aiCtx.p) || '');
+    const text = (mode === 'expand' || mode === 'guide') ? '' : String(getPath(r.data, aiCtx.p) || '');
     $('#aiRun').disabled = true;
     $('#aiSource').textContent = '分析中…';
     $('#aiResult').innerHTML = '<p class="fine">AI 正在分析…</p>';
@@ -1563,6 +1575,7 @@ function bind() {
       const out = await API.call('/api/ai/run', { method: 'POST', body: JSON.stringify({
         mode, field: aiCtx.field, text,
         profession: r.profession || (r.data.base && r.data.base.intent) || '',
+        intent: (r.data.base && r.data.base.intent) || '',
       }) });
       aiCtx.sugg = out.suggestions || [];
       $('#aiSource').textContent = out.source === 'llm' ? '通义千问 · 真 AI' : '规则引擎（站长配置 API key 后自动切换真 AI）';
