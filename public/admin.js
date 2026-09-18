@@ -161,6 +161,15 @@ function bind() {
       }
       if (act === 'tg') { await api('invite/toggle', { method: 'POST', body: { code: b.dataset.c, enabled: b.dataset.v === '1' } }); codes(); }
       if (act === 'gdel') { await api('glossary/delete', { method: 'POST', body: { id: b.dataset.i } }); gloss(); }
+
+      if (act === 'aisave') {
+        const body = { model: $('#aiModel').value.trim(), base: $('#aiBase').value.trim() };
+        if ($('#aiKey').value.trim()) body.key = $('#aiKey').value.trim();
+        const d = await api('ai', { method: 'POST', body });
+        $('#aiState').textContent = d.hasKey ? `已保存：真 AI 已启用（模型 ${$('#aiModel').value.trim() || 'qwen-plus'}）` : '已保存：当前为规则引擎模式';
+        if ($('#aiKey').value.trim()) $('#aiKey').value = '';
+        toast('AI 配置已保存');
+      }
       if (act === 'edit') {
         const raw = JSON.parse($('#tplTable').dataset.raw || '[]');
         const t = raw.find((x) => x.slug === b.dataset.s);
@@ -183,7 +192,14 @@ function bind() {
 
 (async function boot() {
   bind();
+  $('#aiSave').setAttribute('data-act', 'aisave');
   try {
+    const st = await api('ai').catch(() => null);
+    if (st) {
+      $('#aiModel').value = st.model || '';
+      $('#aiBase').value = st.base || '';
+      $('#aiState').textContent = st.hasKey ? `真 AI 已启用（key 尾号 ${st.keyTail}，模型 ${st.model}）` : '当前为规则引擎模式，填入 key 启用通义千问';
+    }
     await overview();
     await tplList();
     $('#who').textContent = '当前身份：站长';

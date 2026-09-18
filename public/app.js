@@ -31,6 +31,11 @@ const DEFAULT_THEME = {
   font: 'sans',
   photo: 'rounded',
   head: 'bar',
+  titleStyle: 'bar',
+  nameStyle: 'default',
+  skillLevel: 'bar',
+  infoCols: 3,
+  nameColor: '', intentColor: '', companyColor: '', roleColor: '', bodyColor: '',
   mask: false,
   hidden: [],
 };
@@ -46,48 +51,94 @@ const STYLES = [
   { id: 'magazine', name: '杂志双栏', layout: 'magazine', head: 'underline', font: 'serif', dens: 1, lh: 1.5, accent: '#7a3f5c' },
   { id: 'corporate', name: '稳重大方', layout: 'banner', head: 'underline', font: 'serif', dens: 1.02, lh: 1.6, accent: '#35566b' },
   { id: 'ats', name: 'ATS 纯文本', layout: 'default', head: 'plain', font: 'sans', dens: 1, lh: 1.6, accent: '#333333', ats: true },
+  /* 图案型版式：style id 即图案开关，渲染靠 .st-<id> 的 CSS + pageHTML 里的 donut 分支 */
+  { id: 'blueprint', name: '工程蓝图', layout: 'default', head: 'underline', font: 'sans', dens: 1, lh: 1.55, accent: '#1f6f8f' },
+  { id: 'donut', name: '数据环视', layout: 'default', head: 'bar', font: 'sans', dens: 1, lh: 1.55, accent: '#4a3f8f' },
+  { id: 'voyage', name: '航线差旅', layout: 'default', head: 'bar', font: 'sans', dens: 1, lh: 1.58, accent: '#117a65' },
+  { id: 'terminal', name: '极客终端', layout: 'default', head: 'plain', font: 'mono', dens: 1, lh: 1.6, accent: '#39d353', dark: true },
 ];
 const styleOf = (id) => STYLES.find((s) => s.id === id) || STYLES[0];
 const styleTheme = (s) => ({
   ...DEFAULT_THEME, layout: s.layout, style: s.id, accent: s.accent, head: s.head, font: s.font,
-  dens: s.dens, lh: s.lh, timeline: !!s.timeline, ats: !!s.ats, hidden: [],
+  titleStyle: s.titleStyle || s.head, nameStyle: s.nameStyle || 'default',
+  dens: s.dens, lh: s.lh, timeline: !!s.timeline, ats: !!s.ats, dark: !!s.dark, hidden: [],
 });
 
-/* 简历主题库：样式骨架 + 配色 + 疏密字体，成套一键套用 */
+/* 简历主题库：样式骨架 + 标题结构 + 姓名样式 + 分部位文字配色，成套一键套用（彼此差异明显） */
 const RESUME_THEMES = [
-  { id: 'min-ink', name: '石墨极简', g: '极简', base: 'minimal', accent: '#1c1c1e' },
-  { id: 'min-grey', name: '灰阶极简', g: '极简', base: 'minimal', accent: '#4b4b50' },
-  { id: 'min-navy', name: '蓝墨极简', g: '极简', base: 'minimal', accent: '#0f3460' },
-  { id: 'cl-blue', name: '沉稳蓝', g: '商务', base: 'classic', accent: '#2f5c8f' },
-  { id: 'cl-steel', name: '钢青商务', g: '商务', base: 'classic', accent: '#35566b' },
-  { id: 'cl-red', name: '中国红', g: '商务', base: 'classic', accent: '#c0392b' },
-  { id: 'mo-navy', name: '深海蓝块', g: '现代', base: 'modern', accent: '#0f3460' },
-  { id: 'mo-green', name: '松墨绿块', g: '现代', base: 'modern', accent: '#1f6f5c' },
-  { id: 'mo-violet', name: '靛蓝紫块', g: '现代', base: 'modern', accent: '#4a3f8f' },
-  { id: 'mo-rust', name: '赭石块', g: '现代', base: 'modern', accent: '#8f3f2f' },
+  /* 极简 */
+  { id: 'min-ink', name: '石墨极简', g: '极简', base: 'minimal', accent: '#1c1c1e', titleStyle: 'plain', nameStyle: 'big' },
+  { id: 'min-grey', name: '灰阶极简', g: '极简', base: 'minimal', accent: '#4b4b50', titleStyle: 'leftblock' },
+  { id: 'min-navy', name: '蓝墨极简', g: '极简', base: 'minimal', accent: '#0f3460', titleStyle: 'underline', nameStyle: 'under' },
+  { id: 'min-serif', name: '宋墨居中', g: '极简', base: 'minimal', accent: '#1c1c1e', font: 'serif', titleStyle: 'centerline', nameStyle: 'serif' },
+  /* 商务 */
+  { id: 'cl-blue', name: '沉稳蓝', g: '商务', base: 'classic', accent: '#2f5c8f', titleStyle: 'underline', companyColor: '#1f3a5f' },
+  { id: 'cl-steel', name: '钢青商务', g: '商务', base: 'classic', accent: '#35566b', titleStyle: 'leftblock' },
+  { id: 'cl-red', name: '中国红', g: '商务', base: 'classic', accent: '#c0392b', nameColor: '#c0392b', companyColor: '#7a1f16' },
+  { id: 'cl-navybox', name: '藏青描边', g: '商务', base: 'classic', accent: '#1f3a5f', nameStyle: 'boxed', titleStyle: 'bar' },
+  { id: 'cl-green', name: '墨绿编号', g: '商务', base: 'classic', accent: '#1f6f5c', titleStyle: 'numbered' },
+  /* 现代 */
+  { id: 'mo-navy', name: '深海蓝块', g: '现代', base: 'modern', accent: '#0f3460', titleStyle: 'bar', nameStyle: 'big' },
+  { id: 'mo-green', name: '松墨绿块', g: '现代', base: 'modern', accent: '#1f6f5c', titleStyle: 'leftblock' },
+  { id: 'mo-violet', name: '靛蓝紫块', g: '现代', base: 'modern', accent: '#4a3f8f', titleStyle: 'bar' },
+  { id: 'mo-rust', name: '赭石编号', g: '现代', base: 'modern', accent: '#8f3f2f', titleStyle: 'numbered' },
+  { id: 'mo-coral', name: '珊瑚居中', g: '现代', base: 'modern', accent: '#e0684b', titleStyle: 'centerline', nameStyle: 'under' },
+  /* 侧栏 */
   { id: 'sb-navy', name: '深蓝侧栏', g: '侧栏', base: 'sidebar', accent: '#244a75' },
   { id: 'sb-teal', name: '青竹侧栏', g: '侧栏', base: 'sidebar', accent: '#117a65' },
   { id: 'sb-plum', name: '绛紫侧栏', g: '侧栏', base: 'sidebar', accent: '#7a3f5c' },
+  { id: 'sb-ink', name: '墨黑侧栏', g: '侧栏', base: 'sidebar', accent: '#1c1c1e' },
+  { id: 'sb-blue', name: '海蓝侧栏', g: '侧栏', base: 'sidebar', accent: '#0a84ff' },
+  /* 横幅 */
   { id: 'bn-teal', name: '青绿横幅', g: '横幅', base: 'banner', accent: '#1f6f5c' },
   { id: 'bn-amber', name: '暖橙横幅', g: '横幅', base: 'banner', accent: '#b5651d' },
   { id: 'bn-blue', name: '亮蓝横幅', g: '横幅', base: 'banner', accent: '#0a84ff' },
+  { id: 'bn-navy', name: '藏青横幅', g: '横幅', base: 'banner', accent: '#1f3a5f' },
+  { id: 'bn-wine', name: '酒红横幅', g: '横幅', base: 'banner', accent: '#7a2f43' },
+  /* 时间轴 */
   { id: 'tl-green', name: '松绿时间轴', g: '时间轴', base: 'timeline', accent: '#1f6f5c' },
   { id: 'tl-steel', name: '钢蓝时间轴', g: '时间轴', base: 'timeline', accent: '#2b5f7a' },
+  { id: 'tl-plum', name: '紫罗兰时间轴', g: '时间轴', base: 'timeline', accent: '#6a4a8f' },
+  /* 杂志 */
   { id: 'mg-plum', name: '绛紫双栏', g: '杂志', base: 'magazine', accent: '#7a3f5c' },
   { id: 'mg-olive', name: '橄榄双栏', g: '杂志', base: 'magazine', accent: '#3b5c2f' },
-  { id: 'co-navy', name: '稳重大方', g: '特殊', base: 'corporate', accent: '#35566b' },
+  { id: 'mg-serif', name: '衬线杂志', g: '杂志', base: 'magazine', accent: '#1c1c1e', font: 'serif', nameStyle: 'serif', titleStyle: 'centerline' },
+  /* 图案 */
+  { id: 'pt-blueprint', name: '工程蓝图', g: '图案', base: 'blueprint', accent: '#1f6f8f' },
+  { id: 'pt-donut', name: '数据环视', g: '图案', base: 'donut', accent: '#4a3f8f' },
+  { id: 'pt-voyage', name: '航线差旅', g: '图案', base: 'voyage', accent: '#117a65' },
+  { id: 'pt-terminal', name: '极客终端', g: '图案', base: 'terminal', accent: '#39d353' },
+  /* 编辑设计 */
+  { id: 'ed-mono', name: '编辑·描边大字', g: '编辑设计', base: 'modern', accent: '#111111', nameStyle: 'boxed', titleStyle: 'numbered' },
+  { id: 'ed-serif', name: '编辑·衬线居中', g: '编辑设计', base: 'classic', accent: '#1f3a5f', nameStyle: 'serif', titleStyle: 'centerline', font: 'serif' },
+  { id: 'ed-duo', name: '编辑·双色标题', g: '编辑设计', base: 'classic', accent: '#0f3460', secColor: '#c0392b', companyColor: '#c0392b', titleStyle: 'underline' },
+  { id: 'ed-band', name: '编辑·色带网格', g: '编辑设计', base: 'modern', accent: '#117a65', titleStyle: 'bar', nameStyle: 'big', tex: 'grid' },
+  { id: 'ed-morandi', name: '编辑·莫兰迪', g: '编辑设计', base: 'classic', accent: '#9c6f66', secondary: '#8a7a76', paperBg: '#f6f1ec', titleStyle: 'leftblock' },
+  /* 彩色分层（分部位文字配色示范） */
+  { id: 'ct-rainbow', name: '多彩分层', g: '彩色分层', base: 'classic', accent: '#2f5c8f', nameColor: '#0f3460', intentColor: '#1f6f5c', companyColor: '#c0392b', roleColor: '#8a5a19', tmColor: '#6a4a8f', titleStyle: 'numbered' },
+  { id: 'ct-ocean', name: '海蓝分层', g: '彩色分层', base: 'modern', accent: '#0a84ff', nameColor: '#0a84ff', companyColor: '#0f3460', roleColor: '#1f6f5c', titleStyle: 'leftblock' },
+  { id: 'ct-forest', name: '森绿分层', g: '彩色分层', base: 'classic', accent: '#1f6f5c', nameColor: '#14513f', companyColor: '#8a5a19', roleColor: '#2b5f7a', paperBg: '#f2fbf6', titleStyle: 'underline' },
+  /* 图标专业（对应参考截图：章节图标 + 双栏基本信息 + 技能条） */
+  { id: 'ip-teal', name: '图标·青专业', g: '图标专业', base: 'classic', accent: '#1f6f5c', titleStyle: 'icon', infoCols: 2 },
+  { id: 'ip-blue', name: '图标·海蓝', g: '图标专业', base: 'classic', accent: '#0a84ff', titleStyle: 'icon', infoCols: 2 },
+  { id: 'ip-navy', name: '图标·藏青', g: '图标专业', base: 'modern', accent: '#1f3a5f', titleStyle: 'icon', infoCols: 2, nameStyle: 'under' },
+  { id: 'ip-warm', name: '图标·暖金', g: '图标专业', base: 'classic', accent: '#b5651d', titleStyle: 'icon', infoCols: 2, skillLevel: 'text' },
   { id: 'ats-plain', name: 'ATS 纯文本', g: '特殊', base: 'ats', accent: '#333333' },
+  { id: 'co-navy', name: '稳重大方', g: '特殊', base: 'corporate', accent: '#35566b' },
 ];
 const THEME_GROUPS = ['全部', ...Array.from(new Set(RESUME_THEMES.map((t) => t.g)))];
 function themeObj(t) {
   const o = styleTheme(styleOf(t.base));
   o.accent = t.accent;
   o.themeId = t.id;
+  ['secondary', 'titleStyle', 'nameStyle', 'skillLevel', 'infoCols', 'nameColor', 'intentColor', 'companyColor', 'roleColor', 'bodyColor', 'secColor', 'tmColor', 'paperBg', 'dark', 'tex', 'font']
+    .forEach((k) => { if (t[k] !== undefined) o[k] = t[k]; });
   return o;
 }
 function applyTheme(r, t) {
   const o = themeObj(t);
-  r.theme = { ...r.theme, ...o, hidden: r.theme.hidden || [] };
+  const full = Object.assign({ secColor: '', tmColor: '', paperBg: '', dark: false, tex: 'none', nameColor: '', intentColor: '', companyColor: '', roleColor: '', bodyColor: '', skillLevel: 'bar', infoCols: 3 }, o);
+  r.theme = { ...r.theme, ...full, hidden: r.theme.hidden || [] };
   r.layout = o.layout;
 }
 
@@ -102,12 +153,50 @@ const LAYOUTS = [
   ['magazine', '杂志双栏'],
   ['sidebar', '左侧边栏'],
 ];
-const FONTS = [['sans', '无衬线（现代）'], ['serif', '衬线（正式）'], ['mix', '标题衬线 + 正文无衬线']];
+const FONTS = [
+  ['sans', '系统无衬线'], ['hei', '思源黑 / 苹方'], ['song', '宋体 / 明朝体'], ['kai', '楷体'], ['fang', '仿宋'],
+  ['mix', '标题衬线 + 正文黑'], ['gserif', '西文衬线（Georgia）'], ['gsans', '西文无衬线（Helvetica）'], ['playfair', '展示衬线（Playfair）'], ['mono', '等宽（代码）'],
+];
+/* 字体键 → CSS family（用系统可得字体 + 兜底，无需联网加载 web font） */
+const FONT_MAP = {
+  sans: '-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif',
+  hei: '"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC","Noto Sans SC",sans-serif',
+  song: '"Songti SC","SimSun","Source Han Serif SC","Noto Serif SC",serif',
+  kai: '"Kaiti SC","KaiTi","STKaiti","楷体",serif',
+  fang: '"Fangsong SC","FangSong","STFangsong","仿宋",serif',
+  mix: '-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif',
+  gserif: 'Georgia,"Times New Roman","Songti SC",serif',
+  gsans: '"Helvetica Neue",Arial,"Segoe UI",sans-serif',
+  playfair: '"Playfair Display",Georgia,"Songti SC",serif',
+  mono: 'ui-monospace,Menlo,Consolas,"Courier New",monospace',
+  serif: 'Georgia,"Songti SC","SimSun",serif', /* 兼容旧主题值 */
+};
+/* 一键配色预设：整组设置主/辅/标题/时间/纸张底色，含暗色 */
+const THEME_PRESETS = [
+  { name: '沉稳蓝', accent: '#2f5c8f', secondary: '#55606d', secColor: '#2f5c8f', tmColor: '#8d97a3', paperBg: '#ffffff', dark: false },
+  { name: '松墨绿', accent: '#1f6f5c', secondary: '#5c6b64', secColor: '#1f6f5c', tmColor: '#8a9990', paperBg: '#ffffff', dark: false },
+  { name: '莫兰迪·灰粉', accent: '#b0897f', secondary: '#8a7a76', secColor: '#9c6f66', tmColor: '#a99b95', paperBg: '#f6f1ec', dark: false },
+  { name: '国风·朱砂', accent: '#a63a2b', secondary: '#7a5c3e', secColor: '#a63a2b', tmColor: '#9a8a72', paperBg: '#f7f2e7', dark: false },
+  { name: '性冷淡·灰', accent: '#5b6367', secondary: '#8a9096', secColor: '#41484c', tmColor: '#9aa0a3', paperBg: '#f3f4f5', dark: false },
+  { name: '暗夜·墨', accent: '#4aa3ff', secondary: '#9fb3c8', secColor: '#4aa3ff', tmColor: '#8a97a6', paperBg: '#1b1d22', dark: true },
+  { name: '糖果·薄荷', accent: '#2bb673', secondary: '#e08a3c', secColor: '#1f9c60', tmColor: '#9aa79f', paperBg: '#f2fbf6', dark: false },
+  { name: '藏青·金', accent: '#1f3a5f', secondary: '#b08d4f', secColor: '#1f3a5f', tmColor: '#8d8266', paperBg: '#ffffff', dark: false },
+];
 const SECTION_TITLES = {
   base: '基本信息', education: '教育经历', work: '工作经历', projects: '项目经历',
   skills: '专业技能', certs: '证书与荣誉', summary: '自我评价',
 };
 const EN_TITLES = { 教育经历: 'EDUCATION', 工作经历: 'EXPERIENCE', 项目经历: 'PROJECTS', 专业技能: 'SKILLS', 证书与荣誉: 'CERTIFICATES & HONORS', 自我评价: 'SUMMARY' };
+/* 章节线性图标（24×24，stroke 描边），按板块 key 取用 */
+const SECTION_ICONS = {
+  education: '<path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c0 1 2.5 2.5 5 2.5s5-1.5 5-2.5v-4"/><path d="M21 8v5"/>',
+  work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>',
+  projects: '<path d="M4 5h11l5 5v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M15 5v5h5"/>',
+  skills: '<path d="M14 6a4 4 0 0 0-5 5L4 16l4 4 5-5a4 4 0 0 0 5-5l-3 3-2-2 3-3z"/>',
+  certs: '<circle cx="12" cy="9" r="5"/><path d="M9 13l-1 8 4-2 4 2-1-8"/>',
+  summary: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+};
+const iconSvg = (key) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${SECTION_ICONS[key] || SECTION_ICONS.summary}</svg>`;
 const maskPhone = (v) => String(v).replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
 const maskMail = (v) => { const m = String(v).match(/^([^@]{1,2})[^@]*(@.*)$/); return m ? m[1] + '***' + m[2] : v; };
 const STATUSES = ['已投递', '初筛通过', '面试中', '谈薪', '已 offer', '不合适', '已撤回'];
@@ -230,21 +319,53 @@ function mockThumb(theme, layout) {
   const plain = theme.head === 'plain';
   const bar = (w, c = '#dfe4ea', h = 4) => `<i style="display:block;width:${w};height:${h}px;background:${c};border-radius:2px;margin:3px 0"></i>`;
   const line = (w) => `<i style="display:block;width:${w};height:3px;background:#e3e6ea;border-radius:2px;margin:4px 0"></i>`;
+  const ts = theme.titleStyle || theme.head || 'underline';
+  const ns = theme.nameStyle || 'default';
+  const miniTitle = () => ts === 'bar' ? bar('40%', a, 6)
+    : ts === 'icon' ? `<span style="display:flex;align-items:center;gap:3px;margin:4px 0"><b style="width:9px;height:9px;border-radius:50%;background:${a}"></b><span style="width:26px;height:4px;background:${a};border-radius:2px"></span><span style="flex:1;border-top:1px solid ${a};opacity:.4"></span></span>`
+      : ts === 'leftblock' ? `<span style="display:flex;align-items:center;gap:3px;margin:4px 0"><b style="width:3px;height:8px;background:${a};border-radius:1px"></b>${bar('34%','#c8d2de',4)}</span>`
+      : ts === 'numbered' ? `<span style="display:flex;align-items:center;gap:3px;margin:4px 0"><b style="font:600 6px ui-monospace,monospace;color:${a}">01</b>${bar('34%','#c8d2de',4)}</span>`
+        : ts === 'centerline' ? `<span style="display:flex;justify-content:center;margin:4px 0">${bar('30%', a, 5)}</span>`
+          : ts === 'plain' ? bar('34%', '#8b8f96', 4)
+            : `<span style="border-bottom:1px solid ${a};display:block;margin:4px 0 2px">${bar('34%','#c8d2de',4)}</span>`;
+  // 图案版式微缩预览
+  if (theme.style === 'blueprint') {
+    return `<div style="height:100%;background:#eaf3f8;background-image:linear-gradient(rgba(31,111,143,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(31,111,143,.18) 1px,transparent 1px);background-size:11px 11px;padding:6px">
+      ${bar('46%','#1f6f8f',6)}${line('88%')}${line('74%')}${line('82%')}
+      <div style="position:absolute;right:4px;bottom:4px;border:1px solid #1f6f8f;padding:1px 3px;font-size:6px;color:#1f6f8f">图框</div></div>`;
+  }
+  if (theme.style === 'donut') {
+    const ring = (c) => `<span style="width:16px;height:16px;border-radius:50%;display:inline-block;margin:0 3px;background:conic-gradient(${a} 70%,#e6e9ef 0)"></span>`;
+    return `<div style="padding:8px 6px;text-align:center">${ring(a)}${ring(a)}${ring(a)}<div style="margin-top:6px">${line('80%')}${line('64%')}</div></div>`;
+  }
+  if (theme.style === 'voyage') {
+    return `<div style="padding:8px 6px">${bar('40%',a,6)}<div style="display:flex;align-items:center;gap:0;margin:8px 0">
+      <i style="width:6px;height:6px;border-radius:50%;background:${a}"></i><i style="flex:1;border-top:2px dotted ${a}"></i>
+      <i style="width:6px;height:6px;border-radius:50%;background:${a}"></i><i style="flex:1;border-top:2px dotted ${a}"></i>
+      <i style="width:6px;height:6px;border-radius:50%;background:${a}"></i></div>${line('84%')}${line('70%')}</div>`;
+  }
+  if (theme.style === 'terminal') {
+    return `<div style="height:100%;background:#0d1117;padding:7px 8px;font-family:ui-monospace,monospace;font-size:7px;color:#39d353;line-height:1.7">
+      <div>$ ${'>'} resume</div><div style="color:#c9d1d9">${bar('60%','#238636',4)}${bar('80%','#21262d',4)}${bar('50%','#238636',4)}</div></div>`;
+  }
   let body;
   if (theme.timeline) {
     body = `<div style="display:flex;gap:5px;padding:5px 10px 8px"><div style="width:5px;border-left:2px solid ${a};opacity:.45"></div><div style="flex:1">${bar('46%', a, 6)}${line('90%')}${line('76%')}${bar('38%', a, 6)}${line('86%')}</div></div>`;
   } else if (layout === 'magazine') {
     body = `<div style="display:flex;gap:6px;padding:0 10px 8px">${`<div style="flex:1">${bar('100%')}${bar('92%')}${bar('70%')}</div>`.repeat(2)}</div>`;
   } else if (plain) {
-    body = `<div style="padding:0 10px 9px">${bar('32%', '#8b8f96', 5)}${line('92%')}${line('80%')}${line('88%')}${line('58%')}</div>`;
+    body = `<div style="padding:0 10px 9px">${miniTitle()}${line('92%')}${line('80%')}${line('88%')}${line('58%')}</div>`;
   } else {
-    body = `<div style="padding:0 10px 9px">${bar('100%', a, 5)}${bar('88%')}${bar('76%')}${bar('94%')}${bar('62%')}</div>`;
+    body = `<div style="padding:0 10px 9px">${miniTitle()}${bar('88%')}${bar('76%')}${bar('94%')}${bar('62%')}</div>`;
   }
+  const nameBar = ns === 'boxed'
+    ? `<span style="display:inline-block;border:1.5px solid ${a};border-radius:3px;padding:2px 7px;margin:2px 0"><span style="display:block;width:34px;height:5px;background:${a};border-radius:2px"></span></span>`
+    : bar(ns === 'big' ? '52%' : '38%', a, ns === 'big' ? 10 : 8);
   const head = layout === 'banner'
     ? `<div style="background:${a};padding:9px 10px">${bar('34%', '#ffffff', 7)}${bar('48%', 'rgba(255,255,255,.6)')}</div>`
     : layout === 'sidebar'
       ? `<div style="display:flex"><div style="width:34%;background:${a};padding:8px">${bar('60%','#fff',6)}${bar('80%','rgba(255,255,255,.55)')}${bar('70%','rgba(255,255,255,.4)')}</div><div style="flex:1;padding:8px">${bar('50%', '#c8d2de', 6)}${bar('90%')}${bar('82%')}</div></div>`
-      : `<div style="padding:9px 10px">${bar('38%', a, 8)}${bar('56%', '#c8d2de')}${plain ? '' : bar('40%', '#e6ebf1')}</div>`;
+      : `<div style="padding:9px 10px">${nameBar}${bar('56%', '#c8d2de')}${plain ? '' : bar('40%', '#e6ebf1')}</div>`;
   return head + body;
 }
 
@@ -316,16 +437,29 @@ const FIELDS = {
   ],
 };
 
+/* 预选选项：key → index.html 里的 datalist id。输入框仍可自由填写。 */
+const DL = {
+  intent: 'dl-intent', city: 'dl-city', home: 'dl-city', years: 'dl-years',
+  salary: 'dl-salary', available: 'dl-available', license: 'dl-license',
+  nation: 'dl-nation', polity: 'dl-polity', degree: 'dl-degree', major: 'dl-major',
+  role: 'dl-role', name: null, /* skills.name 在下方单独处理 */
+};
+const DL_BY_LABEL = { '职位': 'dl-role', '担任角色': 'dl-role' };
+
 function fieldHTML(item, path) {
   const [label, key, kind] = item;
   const val = getPath(curResume().data, path + '.' + key);
-  if (kind === 'area') return `<div class="f" style="grid-column:1/-1"><span>${esc(label)}</span><textarea class="t" data-p="${path}.${key}">${esc(val)}</textarea></div>`;
+  const dl = DL[key] || DL_BY_LABEL[label] || '';
+  const listAttr = dl ? ` list="${dl}"` : '';
+  if (kind === 'area') return `<div class="f" style="grid-column:1/-1"><span>${esc(label)}</span><textarea class="t" data-p="${path}.${key}">${esc(val)}</textarea><span style="align-self:end"><button class="mini" data-act="ai" data-p="${path}.${key}" data-field="${key}">✨AI</button></span></div>`;
   if (kind === 'month') return `<div class="f"><span>${esc(label)}</span><input class="t" type="month" data-p="${path}.${key}" value="${esc(val)}" /></div>`;
   if (kind === 'email') return `<div class="f"><span>${esc(label)}</span><input class="t" type="email" data-p="${path}.${key}" value="${esc(val)}" placeholder="name@mail.com" /></div>`;
   if (Array.isArray(kind)) {
-    return `<div class="f"><span>${esc(label)}</span><select class="t" data-p="${path}.${key}"><option value="">请选择</option>${kind.map((o) => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
+    const dlid = 'dl-' + path.replace(/[.\d]/g, '') + '-' + key;
+    return `<div class="f"><span>${esc(label)}</span><input class="t" data-p="${path}.${key}" value="${esc(val)}" list="${dlid}" placeholder="请选择或自由填写" />
+      <datalist id="${dlid}">${kind.map((o) => `<option>${esc(o)}</option>`).join('')}</datalist></div>`;
   }
-  return `<div class="f"><span>${esc(label)}</span><input class="t" data-p="${path}.${key}" value="${esc(val)}" /></div>`;
+  return `<div class="f"><span>${esc(label)}</span><input class="t" data-p="${path}.${key}" value="${esc(val)}"${listAttr} /></div>`;
 }
 
 function renderEditor() {
@@ -346,7 +480,7 @@ function renderEditor() {
 
   d.extra = d.extra || [];
   const extraRows = d.extra.map((x, i) => `<div class="row">
-      <input class="t" style="flex:0 0 128px" data-p="extra.${i}.k" value="${esc(x.k)}" placeholder="字段名，如 英语水平" />
+      <input class="t" style="flex:0 0 128px" data-p="extra.${i}.k" value="${esc(x.k)}" list="dl-extrak" placeholder="字段名，如 英语水平" />
       <input class="t" style="flex:1" data-p="extra.${i}.v" value="${esc(x.v)}" placeholder="内容，如 CET-6 545 分" />
       <button class="del" data-act="itemdel" data-k="extra" data-i="${i}">删</button></div>`).join('');
   out.push(`<fieldset><legend>基本信息</legend>${FIELDS.base.map((row) =>
@@ -368,7 +502,7 @@ function renderEditor() {
           ? `<div class="${row.length === 3 ? 'grid3' : 'grid2'}">${row.map((f) => fieldHTML(f, `${key}.${i}`)).join('')}</div>`
           : `<div class="grid2">${fieldHTML(row[0], `${key}.${i}`)}</div>`).join('');
       const bullets = bullet ? `<div class="bullets">${(it.bullets || []).map((b, bi) =>
-        `<div class="brow"><textarea class="t" data-p="${key}.${i}.bullets.${bi}" placeholder="做了什么 → 怎么做 → 量化结果">${esc(b)}</textarea><button class="del" data-act="btdel" data-p="${key}.${i}.bullets.${bi}">×</button></div>`).join('')}
+        `<div class="brow"><textarea class="t" data-p="${key}.${i}.bullets.${bi}" placeholder="做了什么 → 怎么做 → 量化结果">${esc(b)}</textarea><button class="mini" data-act="ai" data-p="${key}.${i}.bullets.${bi}" data-field="bullet">✨AI</button><button class="del" data-act="btdel" data-p="${key}.${i}.bullets.${bi}">×</button></div>`).join('')}
         <button class="mini" data-act="btadd" data-p="${key}.${i}.bullets">+ 加一条要点</button></div>` : '';
       return `<div class="itembox"><div class="ib-h"><span>第 ${i + 1} 条</span><span><button class="mini" data-act="mvup" data-k="${key}" data-i="${i}">↑</button> <button class="mini" data-act="mvdn" data-k="${key}" data-i="${i}">↓</button> <button class="del" data-act="itemdel" data-k="${key}" data-i="${i}">删除</button></span></div>${grid}${bullets}</div>`;
     }).join('');
@@ -382,7 +516,7 @@ function renderEditor() {
 
   out.push(`<fieldset><legend>专业技能</legend>
     <div class="famlabel">能力条（拖动调整熟练度）</div>
-    ${(d.skills || []).map((s, i) => `<div class="row"><input class="t" style="flex:1" data-p="skills.${i}.name" value="${esc(s.name)}" placeholder="技能名" />
+    ${(d.skills || []).map((s, i) => `<div class="row"><input class="t" style="flex:1" data-p="skills.${i}.name" value="${esc(s.name)}" list="dl-skill" placeholder="技能名" />
       <input type="range" min="20" max="100" step="5" data-p="skills.${i}.level" value="${Number(s.level) || 60}" />
       <span style="width:34px;font-size:12px">${Number(s.level) || 60}%</span>
       <button class="del" data-act="itemdel" data-k="skills" data-i="${i}">删</button></div>`).join('')}
@@ -392,7 +526,7 @@ function renderEditor() {
   </fieldset>`);
 
   out.push(`<fieldset><legend>证书与荣誉</legend>
-    ${(d.certs || []).map((c, i) => `<div class="row"><input class="t" style="flex:2" data-p="certs.${i}.name" value="${esc(c.name)}" placeholder="证书名称" />
+    ${(d.certs || []).map((c, i) => `<div class="row"><input class="t" style="flex:2" data-p="certs.${i}.name" value="${esc(c.name)}" list="dl-cert" placeholder="证书名称" />
       <input class="t" style="flex:1" data-p="certs.${i}.date" value="${esc(c.date)}" placeholder="取得时间" />
       <button class="del" data-act="itemdel" data-k="certs" data-i="${i}">删</button></div>`).join('')}
     <button class="mini" data-act="certadd">+ 加证书</button>
@@ -402,6 +536,7 @@ function renderEditor() {
 
   out.push(`<fieldset><legend>自我评价</legend>
     <textarea class="t" style="min-height:88px" data-p="summary" placeholder="3-5 句：年限 + 核心能力 + 代表性成果 + 求职动机">${esc(d.summary)}</textarea>
+    <div class="row" style="justify-content:flex-end"><button class="mini" data-act="ai" data-p="summary" data-field="summary">✨AI 检查 / 优化 / 补充灵感</button></div>
     <p class="hint" style="margin:6px 0 0">提示：写“能带来什么”，别写“吃苦耐劳”。量化比形容词有用。</p>
   </fieldset>`);
 
@@ -413,10 +548,32 @@ function renderEditor() {
       return `<button class="thcard ${r.theme.themeId === t.id ? 'on' : ''}" data-act="theme" data-t="${t.id}" title="${t.name}">
         <span class="sth">${mockThumb(th, th.layout)}</span><span class="stn">${t.name}</span></button>`;
     }).join('')}</div>
+    <div class="famlabel">配色预设</div>
+    <div class="chips palrow">${THEME_PRESETS.map((p, pi) => `<button data-act="preset" data-pi="${pi}"><i style="background:${p.accent}"></i>${p.name}${p.dark ? ' 🌙' : ''}</button>`).join('')}</div>
     <div class="famlabel">配色</div>
     <div class="pal">${PALETTES.map(([c, n]) => `<button class="pal-dot ${String(r.theme.accent).toLowerCase() === c ? 'on' : ''}" style="background:${c}" data-act="palette" data-c="${c}" title="${n} · ${c}"></button>`).join('')}
       <span class="swatch" style="margin-left:auto">主色<input type="color" data-p="#theme.accent" value="${esc(r.theme.accent)}" /></span>
       <span class="swatch">辅助<input type="color" data-p="#theme.secondary" value="${esc(r.theme.secondary)}" /></span>
+    </div>
+    <div class="famlabel">分板块配色（不选则跟随主色）</div>
+    <div class="pal2">
+      <span class="swatch">章节标题<input type="color" data-p="#theme.secColor" value="${esc(r.theme.secColor || r.theme.accent)}" /></span>
+      <span class="swatch">时间/副信息<input type="color" data-p="#theme.tmColor" value="${esc(r.theme.tmColor || '#8d97a3')}" /></span>
+      <span class="swatch">纸张底色<input type="color" data-p="#theme.paperBg" value="${esc(r.theme.paperBg || '#ffffff')}" /></span>
+    </div>
+    <div class="row"><label>底纹</label><select class="t" data-p="#theme.tex">${[['none', '无'], ['grid', '网格'], ['dots', '淡点'], ['lines', '横线']].map(([k, n]) => `<option value="${k}" ${(r.theme.tex || 'none') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <label class="toggle" style="margin-left:auto"><input type="checkbox" data-p="#theme.dark" ${r.theme.dark ? 'checked' : ''} /> 暗色纸张</label></div>
+    <div class="row"><label>标题样式</label><select class="t" data-p="#theme.titleStyle">${[['underline', '下划线'], ['bar', '色条'], ['icon', '图标标题'], ['leftblock', '左色块'], ['numbered', '编号'], ['centerline', '居中分隔'], ['plain', '纯文字']].map(([k, n]) => `<option value="${k}" ${(r.theme.titleStyle || r.theme.head || 'underline') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <label style="flex:0 0 60px">姓名样式</label><select class="t" data-p="#theme.nameStyle">${[['default', '常规'], ['big', '超大'], ['boxed', '描边框'], ['under', '下划线'], ['serif', '衬线大字']].map(([k, n]) => `<option value="${k}" ${(r.theme.nameStyle || 'default') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="row"><label>技能熟练度</label><select class="t" data-p="#theme.skillLevel">${[['bar', '进度条'], ['text', '文字等级'], ['none', '隐藏（只显示技能名）']].map(([k, n]) => `<option value="${k}" ${(r.theme.skillLevel || 'bar') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <label style="flex:0 0 66px">信息栏列数</label><select class="t" data-p="#theme.infoCols">${[[2, '两列'], [3, '三列'], [1, '单列']].map(([k, n]) => `<option value="${k}" ${(Number(r.theme.infoCols) || 3) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="famlabel">文字配色（选填，不填跟随主色）</div>
+    <div class="pal2">
+      <span class="swatch">姓名<input type="color" data-p="#theme.nameColor" value="${esc(r.theme.nameColor || r.theme.accent)}" /></span>
+      <span class="swatch">意向<input type="color" data-p="#theme.intentColor" value="${esc(r.theme.intentColor || r.theme.secondary)}" /></span>
+      <span class="swatch">公司/条目标题<input type="color" data-p="#theme.companyColor" value="${esc(r.theme.companyColor || (r.theme.dark ? '#e6edf3' : '#242b33'))}" /></span>
+      <span class="swatch">职位<input type="color" data-p="#theme.roleColor" value="${esc(r.theme.roleColor || r.theme.secondary)}" /></span>
+      <span class="swatch">正文<input type="color" data-p="#theme.bodyColor" value="${esc(r.theme.bodyColor || (r.theme.dark ? '#e6edf3' : '#242b33'))}" /></span>
     </div>
     <div class="famlabel">排版微调</div>
     <div class="row"><label>字号</label><input type="range" min="0.86" max="1.14" step="0.02" data-p="#theme.sf" value="${r.theme.sf}" /><span style="width:38px;font-size:12px">${Math.round(r.theme.sf * 100)}%</span></div>
@@ -431,6 +588,25 @@ function renderEditor() {
   </fieldset>`);
 
   $('#editor').innerHTML = out.join('');
+  attachFieldExamples(r);
+}
+
+/* 功能：字段悬浮示例——鼠标移到输入框显示同职业的真实范例句（词库驱动，无需 AI） */
+function profOf(r) {
+  let prof = r.profession || '';
+  const intent = (r.data.base && r.data.base.intent) || '';
+  if (!prof && intent) { const m = (state.templates || []).find((t) => t.title && intent.indexOf(t.title.slice(0, 3)) >= 0); if (m) prof = m.slug; }
+  return prof;
+}
+function attachFieldExamples(r) {
+  const g = state.glossary[profOf(r)] || [];
+  const pick = (k) => (g.find((x) => x.kind === k) || {}).text || '';
+  const duty = pick('职责句式'), result = pick('成果句式'), kw = pick('关键词');
+  $$('#editor textarea[data-p*=".bullets."]').forEach((t) => { if (result) { t.title = '范例（数字请换成你自己的）：' + result; if (!t.value) t.placeholder = result.slice(0, 34) + '…'; } });
+  const sm = $('#editor textarea[data-p="summary"]'); if (sm && result) sm.title = '自我评价范例：' + result;
+  $$('#editor input[data-p$=".role"]').forEach((i) => { if (duty) i.title = '可参考职责：' + duty; });
+  const it = $('#editor input[data-p="base.intent"]'); if (it && kw) it.title = '岗位关键词：' + kw;
+  $$('#editor input[data-p$=".name"][data-p^="skills."]').forEach((i) => { if (kw) i.title = '常见技能：' + kw; });
 }
 
 /* --------------------------------------------------------------- 简历预览 */
@@ -450,17 +626,25 @@ function pageHTML(r, forPrint) {
     ? info.filter(([k]) => !dropKeys.includes(k)).map(([k, v]) => [k, k === '电话' ? maskPhone(v) : k === '邮箱' ? maskMail(v) : v])
     : info;
   const photo = (b.photo && !t.ats) ? `<img class="photo ${t.photo}" src="${b.photo}" />` : '';
-  const head = `<div class="head">${photo ? '' : ''}<div><div class="nm">${esc(b.name || '姓名')}</div>
+  const head = `<div class="head nm-${t.nameStyle || 'default'}">${photo ? '' : ''}<div><div class="nm">${esc(b.name || '姓名')}</div>
       ${has(b.intent) ? `<div class="it">${esc(b.intent)}</div>` : ''}</div><div class="sp"></div>${photo}</div>
-      ${shownInfo.length ? `<div class="info">${shownInfo.map((x) => `<div><span class="k">${x[0]}：</span>${esc(x[1])}</div>`).join('')}</div>` : ''}`;
+      ${shownInfo.length ? `<div class="info info-${t.infoCols || 3}">${shownInfo.map((x) => `<div><span class="k">${x[0]}：</span>${esc(x[1])}</div>`).join('')}</div>` : ''}`;
 
+  let secNo = 0;
   const sec = (key, title, inner) => {
     const body = inner();
     if (!body || !show(key)) return '';
+    secNo++;
     const lb = d.lang === 'en' && EN_TITLES[title] ? EN_TITLES[title] : title;
-    const h = t.head === 'bar' ? `<div class="secbar">${lb}</div>`
-      : t.head === 'plain' ? `<div class="secp">${lb}</div>`
-        : `<div class="secu">${lb}</div>`;
+    const ts = t.titleStyle || t.head || 'underline';
+    let h;
+    if (ts === 'bar') h = `<div class="secbar">${lb}</div>`;
+    else if (ts === 'plain') h = `<div class="secp">${lb}</div>`;
+    else if (ts === 'icon') h = `<div class="secicon"><span class="ic">${iconSvg(key)}</span><span class="t">${lb}</span><span class="ln"></span></div>`;
+    else if (ts === 'leftblock') h = `<div class="seclb">${lb}</div>`;
+    else if (ts === 'numbered') h = `<div class="secnum"><i>${String(secNo).padStart(2, '0')}</i>${lb}</div>`;
+    else if (ts === 'centerline') h = `<div class="secc"><span>${lb}</span></div>`;
+    else h = `<div class="secu">${lb}</div>`;
     return `<div class="sec">${h}${body}</div>`;
   };
   const exp = (o) => `<div class="exphead"><b>${esc(o.company || o.name || '')}</b>${has(o.role) ? `<span class="role">${esc(o.role)}</span>` : ''}<span class="tm">${[o.start, o.end].filter(Boolean).join(' – ')}</span></div>`;
@@ -480,9 +664,27 @@ function pageHTML(r, forPrint) {
       const tagText = (d.skillTags || []).filter(has).length ? `<div class="infoline">${esc((d.skillTags || []).filter(has).join('、'))}</div>` : '';
       return asText + tagText;
     }
+    if (t.style === 'donut') {
+      const rings = named.map((s) => {
+        const lv = Math.min(100, Number(s.level) || 60);
+        return `<div class="dnut"><span class="ring" style="--p:${lv}"><i>${lv}</i></span><b>${esc(s.name)}</b></div>`;
+      }).join('');
+      const tags = (d.skillTags || []).filter(has).length ? `<div class="tags" style="margin-top:8px">${d.skillTags.filter(has).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>` : '';
+      return (rings ? `<div class="dnutwrap">${rings}</div>` : '') + tags;
+    }
+    const levelWord = (n) => { n = Math.min(100, Number(n) || 60); return n >= 85 ? '精通' : n >= 70 ? '熟练' : n >= 55 ? '良好' : '了解'; };
+    const sl = t.skillLevel || 'bar';
+    const tags = (d.skillTags || []).filter(has).length ? `<div class="tags" style="margin-top:6px">${d.skillTags.filter(has).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>` : '';
+    if (sl === 'none') {
+      const names = named.length ? `<div class="tags">${named.map((s) => `<span class="tag">${esc(s.name)}</span>`).join('')}</div>` : '';
+      return names + tags;
+    }
+    if (sl === 'text') {
+      const rows = named.length ? `<div class="skltext">${named.map((s) => `<div class="sklrow"><span class="sk">${esc(s.name)}</span><span class="lv">${levelWord(s.level)}</span></div>`).join('')}</div>` : '';
+      return rows + tags;
+    }
     const bars = named.map((s) =>
       `<div class="skl"><span>${esc(s.name)}</span><span class="track"><i style="width:${Math.min(100, Number(s.level) || 60)}%"></i></span></div>`).join('');
-    const tags = (d.skillTags || []).filter(has).length ? `<div class="tags" style="margin-top:6px">${d.skillTags.filter(has).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>` : '';
     return bars + tags;
   };
   const cert = () => {
@@ -501,10 +703,13 @@ function pageHTML(r, forPrint) {
     sec('summary', '自我评价', sum),
   ].join('');
 
-  const vars = `--accent:${t.accent};--secondary:${t.secondary};--tagbg:${mix(t.accent, '#ffffff', 0.88)};--sf:${t.sf};--lh:${t.lh};--ls:${t.ls}px;--dens:${t.dens};`;
-  const family = t.font === 'serif' ? 'Georgia,"Songti SC","SimSun",serif'
-    : t.font === 'mix' ? 'inherit' : 'inherit';
-  const cls = `page layout-${t.layout} font-${t.font} st-${t.style || 'classic'}${t.timeline ? ' has-tl' : ''}${t.ats ? ' is-ats' : ''}`;
+  const cslot = (t.nameColor ? `--namec:${t.nameColor};` : '') + (t.intentColor ? `--intentc:${t.intentColor};` : '')
+    + (t.companyColor ? `--companyc:${t.companyColor};` : '') + (t.roleColor ? `--rolec:${t.roleColor};` : '') + (t.bodyColor ? `--bodyc:${t.bodyColor};` : '');
+  const vars = `--accent:${t.accent};--secondary:${t.secondary};--tagbg:${mix(t.accent, '#ffffff', 0.88)};--sf:${t.sf};--lh:${t.lh};--ls:${t.ls}px;--dens:${t.dens};`
+    + `--sec:${t.secColor || t.accent};--tm:${t.tmColor || '#8d97a3'};--paperbg:${t.dark ? '#1b1d22' : (t.paperBg || '#fff')};--inkp:${t.dark ? '#e6edf3' : '#242b33'};` + cslot;
+  const family = FONT_MAP[t.font] || FONT_MAP.sans;
+  const cls = `page layout-${t.layout} font-${t.font} st-${t.style || 'classic'}${t.timeline ? ' has-tl' : ''}${t.ats ? ' is-ats' : ''}${t.dark ? ' is-dark' : ''}${t.tex && t.tex !== 'none' ? ' tex-' + t.tex : ''}`;
+  const route = `<div class="route"><span class="nd"></span><span class="ln"></span><span class="nd"></span><span class="ln"></span><span class="nd"></span><span class="pl">✈</span></div>`;
 
   if (t.layout === 'banner') {
     return `<div class="${cls}" style="${vars};font-family:${family}">
@@ -513,7 +718,7 @@ function pageHTML(r, forPrint) {
   if (t.layout === 'sidebar') {
     const side = `${head}<div class="secu">专业技能</div>${skl() || '<div class="sb">—</div>'}
       <div class="secu">证书与荣誉</div><div class="sb">${(d.certs || []).filter((c) => has(c.name)).map((c) => esc(c.name)).join('、') || '—'}</div>
-      <div class="secu">联系方式</div><div class="sb">${shownInfo.map((x) => esc(x[1])).join('<br/>') || '—'}</div>`;
+      <div class="secu">联系方式</div><div class="sb sb-contact">${shownInfo.map((x) => `<span class="ck">${esc(x[0])}</span><span class="cv">${esc(x[1])}</span>`).join('') || '—'}</div>`;
     return `<div class="${cls}" style="${vars};font-family:${family}">
       <div class="side" style="background:${t.accent}">${side}</div>
       <div class="main">${[sec('education', '教育经历', edu), sec('work', '工作经历', work), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum)].join('')}</div></div>`;
@@ -521,7 +726,8 @@ function pageHTML(r, forPrint) {
   if (t.layout === 'magazine') {
     return `<div class="${cls}" style="${vars};font-family:${family}">${head}<div class="rule"></div><div class="body">${main}</div></div>`;
   }
-  return `<div class="${cls}" style="${vars};font-family:${family}">${head}<div class="rule"></div>${main}</div>`;
+  const deco = t.style === 'voyage' ? route : '<div class="rule"></div>';
+  return `<div class="${cls}" style="${vars};font-family:${family}">${head}${deco}${main}</div>`;
 }
 
 function mix(hex, hex2, ratio) {
@@ -649,10 +855,14 @@ function analyzeJd() {
   const r = curResume(); if (!r) { toast('先新建一份简历', true); return; }
   const jd = $('#jdText').value.trim();
   if (jd.length < 15) { $('#jdResult').innerHTML = '<p class="fine">粘贴的 JD 太短，至少几十个字。</p>'; return; }
+  const { pct, hit, miss, extra } = jdMatch(r, jd);
+  renderJdResult(pct, hit, miss, extra);
+}
+/* 复用给岗位库排行：某简历 vs 某 JD 的关键词命中 */
+function jdMatch(r, jd) {
   const corpus = resumeCorpus(r), corpusU = corpus.toUpperCase();
-  const terms = jdTerms(jd);
   const hit = [], miss = [];
-  for (const [term, disp] of terms) {
+  for (const [term, disp] of jdTerms(jd)) {
     const inResume = /[A-Za-z]/.test(disp) ? corpusU.includes(term) : corpus.includes(disp);
     (inResume ? hit : miss).push(disp);
   }
@@ -661,7 +871,7 @@ function analyzeJd() {
   const jdU = jd.toUpperCase();
   const mySkills = (r.data.skillTags || []).concat((r.data.skills || []).map((s) => s.name)).filter(Boolean);
   const extra = mySkills.filter((s) => s && !jdU.includes(s.toUpperCase()) && !jd.includes(s));
-  renderJdResult(pct, hit, miss, extra);
+  return { pct, hit, miss, extra };
 }
 function renderJdResult(pct, hit, miss, extra) {
   const verdict = pct >= 70 ? '匹配度较高，把命中关键词写进经历要点里即可。' : pct >= 40 ? '有一定匹配，建议补齐下面的缺口关键词。' : '匹配度偏低，考虑换更对口的岗位或针对性补技能。';
@@ -1002,21 +1212,39 @@ function bindImport() {
 
 async function renderApps() {
   $('#appForm').innerHTML = `<input class="t" id="apCompany" placeholder="公司" />
-    <input class="t" id="apPos" placeholder="岗位" />
-    <input class="t" id="apChan" placeholder="渠道（内推/BOSS/官网）" />
+    <input class="t" id="apPos" placeholder="岗位" list="dl-intent" />
+    <input class="t" id="apChan" placeholder="渠道（内推/BOSS/官网）" list="dl-appchan" />
     <input class="t" id="apDate" type="date" />
     <select class="t" id="apStatus">${STATUSES.map((s) => `<option>${s}</option>`).join('')}</select>
     <button class="btn navy" id="apAdd">记录一次投递</button>`;
   let items = [];
   if (state.me) { try { items = (await API.call('/api/applications')).items || []; } catch (e) { toast(e.message, true); } }
   else items = load('rw.apps', []);
-  $('#appTable').innerHTML = items.length
+  $('#appTable').innerHTML = funnelHTML(items) + (items.length
     ? `<table class="tr"><tr><th>公司</th><th>岗位</th><th>渠道</th><th>日期</th><th>状态</th><th></th></tr>${items.map((a) =>
       `<tr><td>${esc(a.company)}</td><td>${esc(a.position || '')}</td><td>${esc(a.channel || '')}</td><td>${esc(a.applied_on || '')}</td>
         <td><span class="pill ${statusCls(a.status)}">${esc(a.status)}</span></td>
         <td style="text-align:right"><button class="del" data-appdel="${esc(a.id)}">删</button></td></tr>`).join('')}</table>`
-    : '<p class="hint">记一记投了哪家、什么状态，避免重复投和跟进断档。</p>';
+    : '<p class="hint">记一记投了哪家、什么状态，避免重复投和跟进断档。</p>');
   $('#appTable').dataset.guest = JSON.stringify(items);
+}
+
+/* 功能：投递漏斗看板（按状态推进的转化视图） */
+function funnelHTML(items) {
+  if (!items || !items.length) return '';
+  const stages = ['已投递', '初筛通过', '面试中', '谈薪', '已 offer'];
+  // 到达某阶段 = 状态本身或其后（更靠后的阶段），体现漏斗累计
+  const reached = (a, idx) => { const k = stages.indexOf(a.status); return k >= 0 ? k >= idx : false; };
+  const counts = stages.map((_, i) => items.filter((a) => reached(a, i)).length);
+  const top = counts[0] || 1;
+  const maxc = Math.max(...counts, 1);
+  const rows = stages.map((s, i) => `<div class="fn-row"><span class="fn-lab">${s}</span>
+    <span class="fn-bar" style="width:${Math.max(6, Math.round(counts[i] / maxc * 100))}%"><i>${counts[i]}</i></span>
+    <span class="fn-pct">${Math.round(counts[i] / top * 100)}%</span></div>`).join('');
+  const offer = counts[4];
+  const rate = top ? Math.round(offer / top * 100) : 0;
+  const rej = items.filter((a) => ['不合适', '已撤回'].includes(a.status)).length;
+  return `<div class="funnel"><div class="fn-h">投递漏斗 <span class="fn-sum">共 ${top} 次投递 · offer ${offer}（${rate}%）${rej ? ` · 未通过/撤回 ${rej}` : ''}</span></div>${rows}</div>`;
 }
 const statusCls = (s) => (['已 offer', '面试中'].includes(s) ? 'g' : ['不合适', '已撤回'].includes(s) ? 'r' : s === '谈薪' ? 'y' : '');
 
@@ -1176,6 +1404,7 @@ function bind() {
     const el = e.target;
     const p = el.dataset.p;
     if (!p) return;
+    if (el.type === 'checkbox') return; /* 复选框走 change 处理，避免 value 'on' 误写 */
     const r = curResume();
     const v = el.value;
     if (p === '#name') { r.name = v; renderMine(); }
@@ -1199,6 +1428,7 @@ function bind() {
     if (el.dataset.p === '#layout') { r.theme.layout = el.value; renderPreview(); renderMine(); }
     if (el.name === 'lay') { r.layout = el.value; r.theme.layout = el.value; renderPreview(); renderMine(); markDirty(); }
     if (el.dataset.p === '#theme.mask') { r.theme.mask = el.checked; renderPreview(); markDirty(); return; }
+    if (el.dataset.p === '#theme.dark') { r.theme.dark = el.checked; renderPreview(); markDirty(); return; }
     if (el.name === 'lang') { r.data.lang = el.value; renderPreview(); markDirty(); return; }
     if (el.dataset.p === '#theme.hidden') {
       const on = $$('#editor [data-p="#theme.hidden"]').filter((x) => !x.checked).map((x) => x.value);
@@ -1233,8 +1463,10 @@ function bind() {
     else if (act === 'theme') { const th = RESUME_THEMES.find((x) => x.id === b.dataset.t); if (th) applyTheme(r, th); }
     else if (act === 'thgrp') { state.thGroup = b.dataset.g; renderEditor(); return; }
     else if (act === 'palette') { r.theme.accent = b.dataset.c; }
+    else if (act === 'preset') { const pr = THEME_PRESETS[Number(b.dataset.pi)] || {}; r.theme.accent = pr.accent; r.theme.secondary = pr.secondary; r.theme.secColor = pr.secColor; r.theme.tmColor = pr.tmColor; r.theme.paperBg = pr.paperBg; r.theme.dark = pr.dark; r.theme.themeId = ''; }
     else if (act === 'photo') { $('#filePhoto').click(); return; }
     else if (act === 'photodel') { d.base.photo = ''; }
+    else if (act === 'ai') { openAiFor(b.dataset.p, b.dataset.field); return; }
     renderEditor(); renderPreview(); renderSuggestions(); markDirty();
   });
 
@@ -1306,6 +1538,150 @@ function bind() {
   $('#jdClear').addEventListener('click', () => { $('#jdText').value = ''; $('#jdResult').innerHTML = ''; });
   $('#jdClose').addEventListener('click', () => $('#jdMask').classList.remove('on'));
   $('#jdResult').addEventListener('click', (e) => { const b = e.target.closest('[data-jdadd]'); if (b) jdAddSkill(b.dataset.jdadd); });
+
+  /* -------- AI 写作助手 -------- */
+  const aiCtx = { p: '', field: '', mode: 'check', sugg: [] };
+  function openAiFor(p, field) {
+    const r = curResume(); if (!r) return toast('先新建一份简历', true);
+    const text = String(getPath(r.data, p) || '');
+    aiCtx.p = p; aiCtx.field = field || 'text';
+    aiCtx.mode = text.trim() ? 'check' : 'expand';
+    $$('#aiModes button').forEach((x) => x.classList.toggle('on', x.dataset.mode === aiCtx.mode));
+    $('#aiEditText').hidden = true; $('#aiApply').hidden = true;
+    $('#aiResult').innerHTML = '<p class="fine">正在打开…</p>';
+    $('#aiMask').classList.add('on');
+    aiRunNow();
+  }
+  async function aiRunNow() {
+    const r = curResume(); if (!r) return;
+    const mode = aiCtx.mode;
+    const text = mode === 'expand' ? '' : String(getPath(r.data, aiCtx.p) || '');
+    $('#aiRun').disabled = true;
+    $('#aiSource').textContent = '分析中…';
+    $('#aiResult').innerHTML = '<p class="fine">AI 正在分析…</p>';
+    try {
+      const out = await API.call('/api/ai/run', { method: 'POST', body: JSON.stringify({
+        mode, field: aiCtx.field, text,
+        profession: r.profession || (r.data.base && r.data.base.intent) || '',
+      }) });
+      aiCtx.sugg = out.suggestions || [];
+      $('#aiSource').textContent = out.source === 'llm' ? '通义千问 · 真 AI' : '规则引擎（站长配置 API key 后自动切换真 AI）';
+      const advice = out.advice || [];
+      $('#aiEditText').hidden = !(mode === 'polish' && out.text);
+      $('#aiText').value = out.text || '';
+      $('#aiApply').hidden = !(mode === 'polish' && out.text);
+      let html = advice.map((a) =>
+        `<div class="rv-item ${a.sev === 'warn' ? 'warn' : ''}"><span class="sw"></span><div><div class="t">${esc(a.tag)}</div><div class="d">${esc(a.msg)}</div></div></div>`).join('');
+      if (aiCtx.sugg.length) html += `<div class="famlabel">来自职业词库的参考句式（复制后粘到正文里改写）</div>` + aiCtx.sugg.map((s, i) =>
+        `<div class="rv-item"><span class="sw"></span><div><div class="t">${esc(s)}</div></div><div class="btns"><button class="rv-ok" data-aicopy="${i}">复制</button></div></div>`).join('');
+      $('#aiResult').innerHTML = html || '<p class="fine">没有发现明显问题，写得不错。</p>';
+    } catch (err) {
+      $('#aiSource').textContent = '分析失败';
+      $('#aiResult').innerHTML = `<p class="fine">${esc(err.message)}</p>`;
+    }
+    $('#aiRun').disabled = false;
+  }
+  $('#aiRun').addEventListener('click', aiRunNow);
+  $('#aiClose').addEventListener('click', () => $('#aiMask').classList.remove('on'));
+  $('#aiModes').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    aiCtx.mode = b.dataset.mode;
+    $$('#aiModes button').forEach((x) => x.classList.toggle('on', x === b));
+    aiRunNow();
+  });
+  $('#aiApply').addEventListener('click', () => {
+    const r = curResume(); const v = $('#aiText').value.trim();
+    if (!r || !v) return toast('没有可应用的内容', true);
+    setPath(r.data, aiCtx.p, v);
+    renderEditor(); renderPreview(); renderSuggestions(); markDirty();
+    $('#aiMask').classList.remove('on');
+    toast('已应用到字段');
+  });
+  $('#aiResult').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-aicopy]'); if (!b) return;
+    const s = aiCtx.sugg[Number(b.dataset.aicopy)]; if (!s) return;
+    if (navigator.clipboard) navigator.clipboard.writeText(s).then(() => toast('已复制，去正文粘贴改写')).catch(() => toast('复制失败，请长按手动复制', true));
+    else toast('浏览器不支持自动复制', true);
+  });
+
+  /* -------- 岗位库 + 匹配排行 -------- */
+  const JDS = load('rw.jds', []);
+  function renderJdLib() {
+    $('#jlSaved').innerHTML = JDS.length ? JDS.map((j) =>
+      `<div class="jl-item"><b>${esc(j.name)}</b>${j.company ? ` <span class="hint">· ${esc(j.company)}</span>` : ''}
+        <button class="del" data-jldel="${j.id}">删</button></div>`).join('') : '<p class="hint">还没有岗位：填岗位名 + 粘贴 JD，保存到岗位库。</p>';
+  }
+  $('#btnJdLib').addEventListener('click', () => { $('#jdLibMask').classList.add('on'); renderJdLib(); $('#jlRankBox').innerHTML = ''; });
+  $('#jlClose').addEventListener('click', () => $('#jdLibMask').classList.remove('on'));
+  $('#jlSave').addEventListener('click', () => {
+    const name = $('#jlName').value.trim(), text = $('#jlText').value.trim();
+    if (!name) return toast('请填岗位名', true);
+    if (text.length < 10) return toast('请粘贴 JD 全文（至少 10 字）', true);
+    JDS.push({ id: 'jd' + uid(), name, company: $('#jlCompany').value.trim(), text });
+    localStorage.setItem('rw.jds', JSON.stringify(JDS));
+    $('#jlName').value = ''; $('#jlCompany').value = ''; $('#jlText').value = '';
+    renderJdLib(); toast('已保存到岗位库');
+  });
+  $('#jlSaved').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-jldel]'); if (!b) return;
+    const i = JDS.findIndex((x) => x.id === b.dataset.jldel);
+    if (i >= 0) { JDS.splice(i, 1); localStorage.setItem('rw.jds', JSON.stringify(JDS)); renderJdLib(); }
+  });
+  $('#jlRank').addEventListener('click', () => {
+    const resumes = listFor().filter((r) => r && r.data);
+    if (!JDS.length) return ($('#jlRankBox').innerHTML = '<p class="hint">先保存至少一个岗位。</p>');
+    if (!resumes.length) return ($('#jlRankBox').innerHTML = '<p class="hint">还没有简历，先去「编辑工作台」建一份。</p>');
+    const cells = [];
+    resumes.forEach((r, ri) => JDS.forEach((j, ji) => {
+      const m = jdMatch(r, j.text);
+      cells.push({ rname: r.name || ('简历' + (ri + 1)), jname: j.name, pct: m.pct, miss: m.miss.slice(0, 6), ri, ji });
+    }));
+    cells.sort((a, b) => b.pct - a.pct);
+    const best = {};
+    cells.forEach((c) => { if (best[c.ri] === undefined) best[c.ri] = c; });
+    $('#jlRankBox').innerHTML = `<div class="jlr-t">按匹配度排序（越靠前越适合投）</div>
+      <table class="tr"><tr><th>简历</th><th>岗位</th><th>匹配</th><th>还缺的关键词</th></tr>
+      ${cells.slice(0, 40).map((c) => `<tr class="${best[c.ri] === c ? 'best' : ''}"><td>${esc(c.rname)}</td><td>${esc(c.jname)}</td>
+        <td><span class="score ${c.pct >= 70 ? 'g' : c.pct >= 40 ? 'y' : 'r'}">${c.pct}%</span>${best[c.ri] === c ? ' <b class="hint">↳ 该简历最佳</b>' : ''}</td>
+        <td class="mono-terms">${c.miss.length ? c.miss.map(esc).join('、') : '—'}</td></tr>`).join('')}</table>`;
+  });
+
+  /* -------- 在线简历分享链接 -------- */
+  function shareBase() { return location.origin + location.pathname; }
+  async function renderShares() {
+    if (!state.me) { $('#shList').innerHTML = '<p class="hint">登录后才能生成与管理分享链接。</p>'; return; }
+    try {
+      const { items } = await API.call('/api/share/mine');
+      $('#shList').innerHTML = (items && items.length) ? `<div class="famlabel">我发布的链接</div>` + items.map((s) =>
+        `<div class="sh-item"><a href="${shareBase()}?share=${s.code}" target="_blank" rel="noopener">${shareBase()}?share=${s.code}</a>
+          <span class="hint">${s.need_pass ? '有密码 · ' : ''}${s.expires ? '至 ' + String(s.expires).slice(0, 10) : '长期'}</span>
+          <button class="del" data-shdel="${s.code}">撤销</button></div>`).join('') : '<p class="hint">还没有分享链接。</p>';
+    } catch (e) { $('#shList').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; }
+  }
+  $('#btnShare').addEventListener('click', () => {
+    if (!curResume()) return toast('先新建/打开一份简历', true);
+    $('#shareMask').classList.add('on'); $('#shResult').innerHTML = ''; $('#shPass').value = ''; renderShares();
+  });
+  $('#shClose').addEventListener('click', () => $('#shareMask').classList.remove('on'));
+  $('#shCreate').addEventListener('click', async () => {
+    const r = curResume();
+    if (!r.serverId) return toast('请先保存一次简历（登录状态下），再生成链接', true);
+    try {
+      const out = await API.call('/api/share', { method: 'POST', body: JSON.stringify({ resumeId: r.serverId, password: $('#shPass').value.trim(), days: Number($('#shDays').value || 0) }) });
+      const url = shareBase() + '?share=' + out.code;
+      $('#shResult').innerHTML = `<div class="sh-done">✅ 已生成：<a href="${url}" target="_blank" rel="noopener">${url}</a>
+        <button class="mini" id="shCopy">复制</button></div>`;
+      $('#shCopy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(url).then(() => toast('链接已复制'), () => toast('复制失败', true));
+      renderShares();
+    } catch (e) { toast(e.message, true); }
+  });
+  $('#shList').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-shdel]'); if (!b) return;
+    try { await API.call('/api/share/revoke', { method: 'POST', body: JSON.stringify({ code: b.dataset.shdel }) }); renderShares(); toast('已撤销'); }
+    catch (err) { toast(err.message, true); }
+  });
+
+
   $('#verList').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-rv]');
     if (!b) return;
@@ -1461,7 +1837,36 @@ function setUi(mode) {
 }
 
 /* ---------------------------------------------------------------- 启动 */
+async function runShareMode(code) {
+  document.body.classList.add('share-mode');
+  const main = document.querySelector('main') || document.body;
+  main.innerHTML = '<div class="share-gate">正在加载简历…</div>';
+  function paint(json) {
+    const r = { layout: json.layout || 'default', theme: { ...DEFAULT_THEME, ...(json.theme || {}) }, data: { ...blankData(), ...(json.data || {}) }, name: json.name || '' };
+    main.innerHTML = `<div class="share-bar"><span>📄 ${esc((r.data.base && r.data.base.name) || '简历')} · 在线简历</span>
+      <button class="btn navy" onclick="window.print()">打印 / 存为 PDF</button></div>
+      <div class="paper">${pageHTML(r)}</div>`;
+  }
+  async function load(pass) {
+    let res, j = {};
+    try { res = await fetch('/api/share/view?code=' + encodeURIComponent(code) + (pass ? '&pass=' + encodeURIComponent(pass) : '')); j = await res.json(); }
+    catch (e) { main.innerHTML = '<div class="share-gate">网络错误，请稍后再试。</div>'; return; }
+    if (res.status === 401 && j.error === 'needpass') { gate(); return; }
+    if (!res.ok) { main.innerHTML = `<div class="share-gate">${esc(j.error || '链接无效或已失效')}</div>`; return; }
+    paint(j);
+  }
+  function gate() {
+    main.innerHTML = '<div class="share-gate"><h2>🔒 该简历已加密</h2><input id="sgPass" type="password" placeholder="请输入访问密码" /><button class="btn navy" id="sgGo">查看简历</button></div>';
+    const go = () => load(document.querySelector('#sgPass').value);
+    document.querySelector('#sgGo').onclick = go;
+    document.querySelector('#sgPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  }
+  await load('');
+}
+
 async function boot() {
+  const shareCode = new URLSearchParams(location.search).get('share');
+  if (shareCode) { runShareMode(shareCode); return; }
   bind();
   try {
     const [bs, full] = await Promise.all([API.call('/api/bootstrap'), API.call('/api/templates')]);

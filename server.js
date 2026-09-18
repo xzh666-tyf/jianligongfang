@@ -17,6 +17,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 const SB = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const KEY = process.env.SUPABASE_ANON_KEY || '';
+const DASHSCOPE_KEY = (process.env.DASHSCOPE_API_KEY || '').trim();
 const SESSION_DAYS = 30;
 const MAX_BODY = 10 * 1024 * 1024;
 
@@ -527,6 +528,104 @@ async function apiApplications(req, res, body, user, id) {
   return send(res, 200, { item: out[0] });
 }
 
+/* ------------------------------------------------------------- 在线分享链接 */
+async function apiShareCreate(req, res, body, user) {
+  if (!user) return send(res, 401, { error: '请先登录' });
+  const r = await ownResume(req, user, String(body.resumeId || ''));
+  if (!r) return send(res, 404, { error: '简历不存在或无权限' });
+  const code = newCode(5);
+  const password = String(body.password || '');
+  let pass_salt = null, pass_hash = null;
+  if (password) { pass_salt = crypto.randomBytes(16).toString('hex'); pass_hash = hashPassword(password, pass_salt); }
+  const days = Math.max(0, Math.min(3650, Number(body.days) || 0));
+  const expires_at = days > 0 ? new Date(Date.now() + days * 86400 * 1000).toISOString() : null;
+  await db('shares', { method: 'POST', body: { code, owner: user.id, resume_id: r.id, pass_salt, pass_hash, expires_at } });
+  return send(res, 200, { code });
+}
+async function apiShareMine(req, res, user) {
+  if (!user) return send(res, 401, { error: '请先登录' });
+  const rows = await db('shares', { query: { select: 'code,pass_hash,expires_at,created_at', owner: `eq.${user.id}`, order: 'created_at.desc', limit: 200 } });
+  const items = (rows || []).map((s) => ({ code: s.code, need_pass: !!s.pass_hash, expires: s.expires_at }));
+  return send(res, 200, { items });
+}
+async function apiShareRevoke(req, res, body, user) {
+  if (!user) return send(res, 401, { error: '请先登录' });
+  const code = String(body.code || '');
+  await db('shares', { method: 'DELETE', query: { code: `eq.${code}`, owner: `eq.${user.id}` } });
+  return send(res, 200, { ok: true });
+}
+async function apiShareView(req, res, url) {
+  const code = String(url.searchParams.get('code') || '');
+  const pass = String(url.searchParams.get('pass') || '');
+  if (!code) return send(res, 404, { error: '链接无效' });
+  const rows = await db('shares', { query: { select: '*', code: `eq.${code}`, limit: 1 } });
+  const s = rows && rows[0];
+  if (!s) return send(res, 404, { error: '链接无效或已失效' });
+  if (s.expires_at && new Date(s.expires_at).getTime() < Date.now()) return send(res, 404, { error: '链接已过期' });
+  if (s.pass_hash) {
+    if (!pass || !sameHex(hashPassword(pass, s.pass_salt || ''), s.pass_hash)) return send(res, 401, { error: 'needpass' });
+  }
+  const rs = await db('resumes', { query: { select: 'name,layout,theme,data', id: `eq.${s.resume_id}`, limit: 1 } });
+  const r = rs && rs[0];
+  if (!r) return send(res, 404, { error: '简历不存在或已删除' });
+  return send(res, 200, { name: r.name, layout: r.layout, theme: r.theme, data: r.data });
+}
+
+/* ------------------------------------------------------------- AI 写作助手 */
+async function glossFor(profession) {
+  if (!profession) return [];
+  const rows = await db('tpl_glossary', { query: { select: 'kind,text,weight', profession: `eq.${profession}`, order: 'weight.desc', limit: 40 } });
+  return rows || [];
+}
+function ruleAdvice(field, text) {
+  const advice = [];
+  const t = String(text || '').trim();
+  if (!t) return advice;
+  if (t.length < 15) advice.push({ tag: '太简短', msg: '这条太短，建议写清「做了什么 → 怎么做 → 结果」，至少 20 字。', sev: 'warn' });
+  if (!/[0-9０-９%％]/.test(t)) advice.push({ tag: '缺量化', msg: '没有数字。加上规模/百分比/时长/金额更有说服力，如「提升 12%」。', sev: 'warn' });
+  if (/负责|参与|协助|配合|完成|相关|一些|大量/.test(t)) advice.push({ tag: '偏笼统', msg: '用了「负责/参与」等泛词，换成动词开头的具体成果句更好。', sev: '' });
+  if (t.length > 200) advice.push({ tag: '偏长', msg: '单条超过 200 字，建议拆成 2-3 条要点。', sev: '' });
+  return advice;
+}
+function aiPrompt(mode, field, text, gloss) {
+  const g = gloss.slice(0, 8).map((x) => x.text).join('\n');
+  const base = `你是中文简历优化助手。字段：${field}。`;
+  if (mode === 'polish') return `${base}请把下面这段润色得更专业、量化、简洁，只返回 JSON {"text":"润色结果"}：\n${text}`;
+  if (mode === 'expand') return `${base}该字段为空，请给 4-6 条可参考的写法要点。返回 JSON {"suggestions":["..."]}。同类句式参考：\n${g}`;
+  return `${base}请检查并给建议。返回 JSON {"advice":[{"tag":"","msg":"","sev":"warn或空"}],"suggestions":["参考句式"]}。当前内容：\n${text}\n同类句式参考：\n${g}`;
+}
+async function apiAiRun(req, res, body) {
+  const mode = ['check', 'expand', 'polish'].includes(body.mode) ? body.mode : 'check';
+  const field = String(body.field || 'text').slice(0, 40);
+  const text = String(body.text || '').slice(0, 4000);
+  const profession = String(body.profession || '').slice(0, 60);
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'na';
+  if (blocked(`ai|${ip}`, 60)) return send(res, 429, { error: 'AI 调用太频繁，请稍后再试' });
+  const gloss = await glossFor(profession);
+  const suggestions = gloss.slice(0, 6).map((g) => g.text);
+  if (DASHSCOPE_KEY) {
+    try {
+      const r = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DASHSCOPE_KEY}` },
+        body: JSON.stringify({ model: 'qwen-plus', temperature: 0.6, messages: [{ role: 'user', content: aiPrompt(mode, field, text, gloss) }], response_format: { type: 'json_object' } }),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '{}';
+        let o = {}; try { o = JSON.parse(raw); } catch { o = {}; }
+        return send(res, 200, {
+          source: 'llm',
+          text: mode === 'polish' ? String(o.text || '') : '',
+          suggestions: Array.isArray(o.suggestions) ? o.suggestions.slice(0, 6).map(String) : suggestions,
+          advice: Array.isArray(o.advice) ? o.advice.map((a) => ({ tag: String((a && a.tag) || '建议'), msg: String((a && a.msg) || ''), sev: a && a.sev === 'warn' ? 'warn' : '' })) : ruleAdvice(field, text),
+        });
+      }
+    } catch (e) { /* 落回规则引擎 */ }
+  }
+  return send(res, 200, { source: 'rule', text: '', suggestions, advice: ruleAdvice(field, text) });
+}
+
 /* ------------------------------------------------------------- 站长后台 */
 const ADMIN = makeAdmin({ db, hashPassword, send, templatesCacheBreak, SB, KEY });
 
@@ -631,6 +730,12 @@ async function handleApi(req, res, url, user) {
       'Content-Disposition': `attachment; filename="resume.docx"; filename*=UTF-8''${fname}`,
     });
   }
+
+  if (p === '/api/share' && req.method === 'POST') return apiShareCreate(req, res, body, user);
+  if (p === '/api/share/mine' && req.method === 'GET') return apiShareMine(req, res, user);
+  if (p === '/api/share/revoke' && req.method === 'POST') return apiShareRevoke(req, res, body, user);
+  if (p === '/api/share/view' && req.method === 'GET') return apiShareView(req, res, url);
+  if (p === '/api/ai/run' && req.method === 'POST') return apiAiRun(req, res, body);
 
   return send(res, 404, { error: 'no such api' });
 }

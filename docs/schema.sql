@@ -106,6 +106,17 @@ CREATE TABLE IF NOT EXISTS tpl_meta (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS shares (
+  code        text PRIMARY KEY,
+  owner       text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  resume_id   text NOT NULL,
+  pass_salt   text,
+  pass_hash   text,
+  expires_at  timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shares_owner_idx ON shares (owner, created_at DESC);
+
 -- 自托管（直连 Postgres）时按需放开注释；Supabase 下 anon 角色已有默认授权。
 -- GRANT USAGE ON SCHEMA public TO anon, authenticated;
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
