@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>简历工坊 · 站长后台</title>
+<link rel="stylesheet" href="./style.css" />
+<style>
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 18px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }
+  .stat b { display: block; font-size: 21px; color: var(--navy); }
+  .stat span { font-size: 12px; color: var(--ink2); }
+  .panes { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .panes button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 7px 13px; }
+  .panes button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .pane { display: none; }
+  .pane.on { display: block; }
+  .box { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  .box h3 { margin: 0 0 10px; font-size: 15px; }
+  .form { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 7px; margin-bottom: 10px; }
+  .form textarea, .form input, .form select { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font-size: 13px; }
+  .mono { font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  .danger { color: var(--red); }
+  .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .head h1 { font-size: 17px; margin: 0; }
+  .head .sp { flex: 1; }
+  details summary { cursor: pointer; font-size: 12.5px; color: var(--ink2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>简历工坊 · 站长后台</h1>
+    <span class="hint" id="who"></span>
+    <span class="sp"></span>
+    <a class="btn" href="./index.html">返回前台</a>
+    <button class="btn" id="btnOut">退出登录</button>
+  </div>
+
+  <div class="panes" id="panes">
+    <button data-p="ov" class="on">概览</button>
+    <button data-p="users">账号管理</button>
+    <button data-p="codes">邀请码</button>
+    <button data-p="tpl">模板库</button>
+    <button data-p="gloss">岗位词库</button>
+  </div>
+
+  <section class="pane on" data-p="ov">
+    <div class="cards" id="statCards"></div>
+    <div class="box"><h3>最近注册</h3><div id="recent"></div></div>
+    <div class="box"><h3>模板库刷新</h3>
+      <p class="hint" style="margin-top:0">前台读的是数据库里的模板与词库，改完立即生效（最长 1 分钟缓存）。标记刷新只更新时间戳。</p>
+      <button class="btn navy" id="btnMark">标记为刚刚更新</button></div>
+  </section>
+
+  <section class="pane" data-p="users">
+    <div class="box"><h3>账号列表</h3><div id="userTable"></div></div>
+  </section>
+
+  <section class="pane" data-p="codes">
+    <div class="box"><h3>新建邀请码</h3>
+      <div class="form" style="grid-template-columns:2fr 1fr 1fr auto">
+        <input id="ncCode" placeholder="留空自动生成" /><input id="ncLabel" placeholder="用途备注" />
+        <input id="ncMax" type="number" value="20" placeholder="可用次数" /><button class="btn navy" id="ncAdd">生成</button>
+      </div>
+      <div id="codeTable"></div>
+    </div>
+  </section>
+
+  <section class="pane" data-p="tpl">
+    <div class="box"><h3>职业模板</h3>
+      <div id="tplTable"></div>
+      <details style="margin-top:12px"><summary>新增 / 编辑模板（JSON 方式，谨慎操作）</summary>
+        <div class="form" style="grid-template-columns:1fr 1fr 1fr 1fr; margin-top:8px">
+          <input id="tsSlug" placeholder="slug（英文小写）" /><input id="tsTitle" placeholder="显示名" />
+          <input id="tsInd" placeholder="行业分组" /><input id="tsSort" type="number" placeholder="排序号" />
+        </div>
+        <input id="tsSummary" placeholder="一句话说明：这个岗位该写什么" style="width:100%;margin-bottom:6px;border:1px solid var(--line);border-radius:7px;padding:6px 8px" />
+        <input id="tsTheme" placeholder='主题 JSON，如 {"layout":"sidebar","accent":"#2f5c8f"}' style="width:100%;margin-bottom:6px;border:1px solid var(--line);border-radius:7px;padding:6px 8px" />
+        <textarea id="tsSample" rows="8" placeholder="示例数据 JSON（假名假公司）" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 8px" class="mono"></textarea>
+        <button class="btn navy" id="tsSave" style="margin-top:8px">保存模板</button>
+      </details>
+    </div>
+  </section>
+
+  <section class="pane" data-p="gloss">
+    <div class="box"><h3>岗位词库</h3>
+      <div class="form" style="grid-template-columns:1.4fr 1fr 3fr .6fr auto">
+        <select id="gsProf"></select>
+        <select id="gsKind"><option>职责句式</option><option>成果句式</option><option>关键词</option><option>技能标签</option></select>
+        <input id="gsText" placeholder="要插入的词库句子" /><input id="gsW" type="number" value="8" min="1" max="10" />
+        <button class="btn navy" id="gsAdd">添加</button>
+      </div>
+      <div id="glossTable"></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+<script src="./admin.js"></script>
+</body>
+</html>

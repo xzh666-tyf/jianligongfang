@@ -1,0 +1,20 @@
+# 依赖与本地构建（本项目零第三方依赖，一般不会有，仍兜底忽略）
+node_modules/
+
+# Vercel 本地缓存 / 部署产物
+.vercel/
+
+# 环境变量与密钥：绝不进 Git（.env.example 是模板，保留）
+.env
+.env.local
+.env.*.local
+
+# 导出的原始库转储（仅本地留档，seed_templates.sql 才是入库脚本）
+docs/_templates_dump.json
+
+# 系统与编辑器杂项
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/

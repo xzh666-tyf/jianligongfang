@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>简历工坊 · 多模板在线简历编辑器</title>
+<meta name="description" content="空白模板起步、多份简历管理、导出 PDF / Word / 图片的在线简历工具。" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo">简</span>
+    <span class="bt">简历工坊</span>
+    <span class="bs" id="tplCount"></span>
+  </div>
+  <nav class="tabs" id="tabs">
+    <i class="segthumb" id="segthumb"></i>
+    <button data-view="tpl" class="on">模板中心</button>
+    <button data-view="edit">编辑工作台</button>
+    <button data-view="mine">我的简历</button>
+  </nav>
+  <div class="acct acct-left" id="acct"></div>
+  <div class="tools">
+    <div class="dd">
+      <button class="btn navy" id="btnNew">新建简历 ▾</button>
+      <div class="ddmenu" id="menuNew">
+        <button data-new="blank">空白简历</button>
+        <button data-new="tpl">从职业模板起步</button>
+      </div>
+    </div>
+    <button class="btn" id="btnImport">导入简历</button>
+    <div class="dd">
+      <button class="btn" id="btnExport" disabled>导出 ▾</button>
+      <div class="ddmenu" id="menuExport">
+        <button data-exp="pdf">PDF（打印 / 另存为 PDF）</button>
+        <button data-exp="docx">Word 文档（.docx，可再编辑）</button>
+        <button data-exp="png">图片（.png，适合微信直发）</button>
+        <button data-exp="json">备份文件（.json，换电脑用）</button>
+        <hr />
+        <button data-exp="import">导入备份文件…</button>
+      </div>
+    </div>
+    <div class="dd">
+      <button class="btn" id="btnUi" title="界面外观">外观 ▾</button>
+      <div class="ddmenu" id="menuUi">
+        <button data-ui="auto">跟随系统</button>
+        <button data-ui="light">亮色</button>
+        <button data-ui="dark">暗色</button>
+      </div>
+    </div>
+    <span class="save" id="saveState"></span>
+  </div>
+</header>
+
+<div class="guestbar" id="guestBar" hidden>
+  <span>游客模式下内容只存在这台电脑，换浏览器就看不到了。</span>
+  <button class="btn navy" data-goto="reg">用邀请码注册</button>
+  <button class="btn" data-goto="login">已有账号，登录</button>
+</div>
+
+<main>
+  <!-- 模板中心 -->
+  <section class="view on" id="view-tpl">
+    <div class="tplbar">
+      <input id="tplSearch" class="search" placeholder="搜索职业或岗位，如 结构工程师 / 外贸 / 品质" />
+      <div class="chips" id="tplIndustries"></div>
+    </div>
+    <div class="grid-tpl" id="tplGrid"></div>
+    <p class="hint" id="tplUpdated"></p>
+  </section>
+
+  <!-- 编辑工作台 -->
+  <section class="view" id="view-edit">
+    <div class="app">
+      <div class="editor" id="editor"></div>
+      <div class="stage" id="stage">
+        <div class="stagetools">
+          <span id="pageInfo"></span>
+          <button class="mini" id="btnJd">岗位匹配</button>
+          <button class="mini" id="btnPrevVer">版本历史</button>
+          <button class="mini" id="btnSaveVer">存一个版本</button>
+        </div>
+        <div class="paper" id="paper"></div>
+      </div>
+    </div>
+    <button class="rv-fab" id="rvFab">建议<span class="badge" id="rvBadge">0</span></button>
+    <div class="rv-mask" id="rvMask">
+      <div class="rv-panel">
+        <h3>写作建议<span class="rv-sub">来自模板库岗位词库，逐条接受或忽略</span></h3>
+        <div class="rv-list" id="rvList"></div>
+        <div class="rv-foot">
+          <button class="mini" id="rvClose">关闭</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 我的简历 -->
+  <section class="view" id="view-mine">
+    <div class="mine">
+      <div class="col">
+        <h3>简历列表</h3>
+        <div class="chips" id="labelFilter"></div>
+        <div class="batchbar" id="batchBar" hidden></div>
+        <div id="resumeList" class="rlist"></div>
+        <div class="tip" id="guestTip"></div>
+      </div>
+      <div class="col">
+        <h3>投递跟踪</h3>
+        <div class="app-form" id="appForm"></div>
+        <div class="app-table" id="appTable"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 登录 / 注册 -->
+<div class="auth-mask" id="authMask">
+  <div class="auth">
+    <div class="grabber"></div>
+    <div class="auth-body" data-pane="login">
+      <h2>登录</h2>
+      <label>用户名<input id="liName" autocomplete="username" /></label>
+      <label>密码<input id="liPass" type="password" autocomplete="current-password" /></label>
+      <button class="btn navy wide" id="doLogin">登录</button>
+      <div class="switchrow">
+        <button data-go="reg">用邀请码注册 ›</button>
+        <button data-go="reset">忘记密码 ›</button>
+      </div>
+      <p class="fine">登录状态保留 30 天；同一账号在任意设备打开都是你的简历。</p>
+    </div>
+    <div class="auth-body" data-pane="reg" hidden>
+      <button class="back" data-go="login">‹ 返回</button>
+      <h2>邀请码注册</h2>
+      <label>用户名或手机号<input id="rgName" placeholder="手机号仅作登录名，不发验证码" /></label>
+      <label>密码<input id="rgPass" type="password" placeholder="至少 8 位" /></label>
+      <label>邀请码<input id="rgCode" placeholder="向页面拥有者索取" /></label>
+      <button class="btn navy wide" id="doReg">注册并开始</button>
+      <div class="switchrow">
+        <button data-go="login">‹ 返回登录</button>
+        <button data-go="reset">忘记密码 ›</button>
+      </div>
+      <p class="fine">注册成功后会显示一次性「恢复码」，请立刻保存——忘记密码时凭它自助重置。</p>
+    </div>
+    <div class="auth-body" data-pane="reset" hidden>
+      <button class="back" data-go="login">‹ 返回</button>
+      <h2>恢复码重置密码</h2>
+      <label>用户名<input id="rsName" /></label>
+      <label>恢复码<input id="rsCode" placeholder="注册时保存的那串码" /></label>
+      <label>新密码<input id="rsPass" type="password" placeholder="至少 8 位" /></label>
+      <button class="btn navy wide" id="doReset">重置密码</button>
+      <div class="switchrow"><button data-go="login">‹ 返回登录</button></div>
+      <p class="fine">重置后所有旧登录状态失效，并下发新的恢复码。</p>
+    </div>
+    <button class="auth-x" id="authX">×</button>
+  </div>
+</div>
+
+<div class="modal-mask" id="verMask">
+  <div class="modal">
+    <h3>版本历史</h3>
+    <div id="verList"></div>
+    <button class="mini" id="verClose">关闭</button>
+  </div>
+</div>
+
+<div class="modal-mask" id="impMask">
+  <div class="modal imp">
+    <h3>导入已有简历<span class="rv-sub">把老简历灌进表单，再逐字段改写</span></h3>
+    <div class="chips" id="impTabs">
+      <button data-src="text" class="on">粘贴文本</button>
+      <button data-src="file">选择文件</button>
+      <button data-src="json">备份文件 .json</button>
+    </div>
+    <div class="imp-pane" data-src="text">
+      <textarea id="impText" rows="9" placeholder="在老简历里 Ctrl+A 全选、Ctrl+C 复制，然后粘到这里。支持 Word/PDF 里复制出来的文字。"></textarea>
+      <button class="btn navy" id="impParse">开始识别</button>
+    </div>
+    <div class="imp-pane" data-src="file" hidden>
+      <p class="fine">支持 .pdf / .docx / .txt / .md。文件只在服务端解析文字、不保存原件。扫描件 PDF 或极复杂排版若提取不全，请改用「粘贴文本」。</p>
+      <input type="file" id="impFile" accept=".pdf,.docx,.txt,.md,.csv,.json" />
+    </div>
+    <div class="imp-pane" data-src="json" hidden>
+      <p class="fine">选择本站「导出 → 备份文件」生成的 .json，可一次导入多份简历。</p>
+      <button class="btn" id="impPickJson">选择备份文件…</button>
+    </div>
+    <div class="imp-result" id="impResult"></div>
+    <div class="imp-foot">
+      <input class="t" id="impName" placeholder="新简历名称，如 结构工程师 · 导入版" style="flex:1" />
+      <button class="btn" id="impCancel">取消</button>
+      <button class="btn navy" id="impConfirm" disabled>生成简历</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask jd-mask" id="jdMask">
+  <div class="modal">
+    <h3>岗位匹配<span class="rv-sub">粘贴目标岗位描述（JD），看命中哪些关键词、还缺哪些</span></h3>
+    <div class="jd-tools">
+      <textarea class="t" id="jdText" rows="5" placeholder="把招聘要求的「岗位职责 + 任职要求」整段粘进来，例如：负责户外家具结构设计，熟练使用 SolidWorks/AutoCAD，懂 GD&T 与公差分析，有 DFMEA 经验者优先…"></textarea>
+    </div>
+    <div class="jd-tools">
+      <button class="btn navy" id="jdRun">分析匹配度</button>
+      <button class="btn" id="jdClear">清空</button>
+    </div>
+    <div id="jdResult"></div>
+    <div class="rv-foot"><button class="mini" id="jdClose">关闭</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="filePhoto" accept="image/*" hidden />
+<input type="file" id="fileJson" accept=".json,application/json" hidden />
+
+<script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "resume-workshop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "简历工坊 · 多模板动态简历编辑器",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
