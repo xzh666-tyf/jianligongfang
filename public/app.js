@@ -451,7 +451,7 @@ function fieldHTML(item, path) {
   const val = getPath(curResume().data, path + '.' + key);
   const dl = DL[key] || DL_BY_LABEL[label] || '';
   const listAttr = dl ? ` list="${dl}"` : '';
-  if (kind === 'area') return `<div class="f" style="grid-column:1/-1"><span>${esc(label)}</span><textarea class="t" data-p="${path}.${key}">${esc(val)}</textarea><span style="align-self:end"><button class="mini" data-act="ai" data-p="${path}.${key}" data-field="${key}">✨AI</button></span></div>`;
+  if (kind === 'area') return `<div class="f" style="grid-column:1/-1"><span>${esc(label)}</span><textarea class="t" data-p="${path}.${key}">${esc(val)}</textarea><span style="align-self:end;display:flex;gap:6px"><button class="mini" data-act="aifill" data-p="${path}.${key}" data-field="${key}">✨AI 填写</button><button class="mini" data-act="ai" data-p="${path}.${key}" data-field="${key}">✨AI 建议</button></span></div>`;
   if (kind === 'month') return `<div class="f"><span>${esc(label)}</span><input class="t" type="month" data-p="${path}.${key}" value="${esc(val)}" /></div>`;
   if (kind === 'email') return `<div class="f"><span>${esc(label)}</span><input class="t" type="email" data-p="${path}.${key}" value="${esc(val)}" placeholder="name@mail.com" /></div>`;
   if (Array.isArray(kind)) {
@@ -537,7 +537,7 @@ function renderEditor() {
 
   out.push(`<fieldset><legend>自我评价</legend>
     <textarea class="t" style="min-height:88px" data-p="summary" placeholder="3-5 句：年限 + 核心能力 + 代表性成果 + 求职动机">${esc(d.summary)}</textarea>
-    <div class="row" style="justify-content:flex-end"><button class="mini" data-act="ai" data-p="summary" data-field="summary">✨AI 检查 / 优化 / 补充灵感</button></div>
+    <div class="row" style="justify-content:flex-end;gap:8px"><button class="mini" data-act="aifill" data-p="summary" data-field="summary">✨AI 帮我写</button><button class="mini" data-act="ai" data-p="summary" data-field="summary">✨AI 检查 / 优化</button></div>
     <p class="hint" style="margin:6px 0 0">提示：写“能带来什么”，别写“吃苦耐劳”。量化比形容词有用。</p>
   </fieldset>`);
 
@@ -1470,6 +1470,7 @@ function bind() {
     else if (act === 'ai') { openAiFor(b.dataset.p, b.dataset.field); return; }
     else if (act === 'guide') { openGuide(); return; }
     else if (act === 'workgen') { genWork(b.dataset.k, Number(b.dataset.i), b); return; }
+    else if (act === 'aifill') { aiFill(b.dataset.p, b.dataset.field, b); return; }
     renderEditor(); renderPreview(); renderSuggestions(); markDirty();
   });
 
@@ -1586,6 +1587,26 @@ function bind() {
     }
     renderEditor(); renderPreview(); renderSuggestions(); markDirty();
   }
+  async function aiFill(p, field, btn) {
+    const r = curResume(); if (!r) return toast('先新建一份简历', true);
+    if (btn) { btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = '填写中…'; }
+    try {
+      const out = await API.call('/api/ai/run', { method: 'POST', body: JSON.stringify({
+        mode: 'fill', field,
+        text: String(getPath(r.data, p) || ''),
+        profession: r.profession || (r.data.base && r.data.base.intent) || '',
+        intent: (r.data.base && r.data.base.intent) || '',
+      }) });
+      const txt = (out.text || '').trim();
+      if (txt) { setPath(r.data, p, txt); toast(out.source === 'llm' ? 'AI 已填写' : '已生成参考内容（可再编辑）'); }
+      else toast('没有生成内容', true);
+    } catch (e) {
+      toast(e.message, true);
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset._t || '✨AI 填写'; }
+      return;
+    }
+    renderEditor(); renderPreview(); renderSuggestions(); markDirty();
+  }
   async function aiRunNow() {
     const r = curResume(); if (!r) return;
     const mode = aiCtx.mode;
@@ -1600,7 +1621,7 @@ function bind() {
         intent: (r.data.base && r.data.base.intent) || '',
       }) });
       aiCtx.sugg = out.suggestions || [];
-      $('#aiSource').textContent = out.source === 'llm' ? '通义千问 · 真 AI' : '规则引擎（站长配置 API key 后自动切换真 AI）';
+      $('#aiSource').textContent = out.source === 'llm' ? (out.provider || '真 AI') : '规则引擎（配置豆包/通义千问密钥后自动升级真 AI）';
       const advice = out.advice || [];
       $('#aiEditText').hidden = !(mode === 'polish' && out.text);
       $('#aiText').value = out.text || '';

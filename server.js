@@ -18,6 +18,8 @@ const HOST = process.env.HOST || '0.0.0.0';
 const SB = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const KEY = process.env.SUPABASE_ANON_KEY || '';
 const DASHSCOPE_KEY = (process.env.DASHSCOPE_API_KEY || '').trim();
+const ARK_KEY = (process.env.ARK_API_KEY || '').trim();
+const ARK_MODEL = (process.env.ARK_MODEL || 'doubao-pro-32k').trim();
 const SESSION_DAYS = 30;
 const MAX_BODY = 10 * 1024 * 1024;
 
@@ -587,15 +589,42 @@ function ruleAdvice(field, text) {
   if (t.length > 200) advice.push({ tag: '偏长', msg: '单条超过 200 字，建议拆成 2-3 条要点。', sev: '' });
   return advice;
 }
-function aiPrompt(mode, field, text, gloss) {
+function llmLabel() { return ARK_KEY ? '豆包 · 真 AI' : (DASHSCOPE_KEY ? '通义千问 · 真 AI' : ''); }
+/* 统一大模型入口：优先豆包(火山方舟)，其次通义千问；返回解析后的 JSON 对象，失败返回 null */
+async function llmJSON(prompt) {
+  const calls = [];
+  if (ARK_KEY) calls.push({ url: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', key: ARK_KEY, model: ARK_MODEL, extra: {} });
+  if (DASHSCOPE_KEY) calls.push({ url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', key: DASHSCOPE_KEY, model: 'qwen-plus', extra: { response_format: { type: 'json_object' } } });
+  for (const c of calls) {
+    try {
+      const r = await fetch(c.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${c.key}` },
+        body: JSON.stringify(Object.assign({ model: c.model, temperature: 0.6, messages: [{ role: 'user', content: prompt }] }, c.extra)),
+      });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+      const m = String(raw).match(/\{[\s\S]*\}/);
+      let o = {}; try { o = JSON.parse(m ? m[0] : (raw || '{}')); } catch { o = {}; }
+      if (o && Object.keys(o).length) return o;
+    } catch (e) { /* 试下一个 provider */ }
+  }
+  return null;
+}
+const FIELD_LABEL = { summary: '自我评价', note: '主修课程/成绩', desc: '项目说明', bullet: '工作要点', tags: '技能标签', intent: '求职意向' };
+function aiPrompt(mode, field, text, gloss, roleTitle) {
   const g = gloss.slice(0, 8).map((x) => x.text).join('\n');
-  const base = `你是中文简历优化助手。字段：${field}。`;
-  if (mode === 'polish') return `${base}请把下面这段润色得更专业、量化、简洁，只返回 JSON {"text":"润色结果"}：\n${text}`;
-  if (mode === 'expand') return `${base}该字段为空，请给 4-6 条可参考的写法要点。返回 JSON {"suggestions":["..."]}。同类句式参考：\n${g}`;
-  return `${base}请检查并给建议。返回 JSON {"advice":[{"tag":"","msg":"","sev":"warn或空"}],"suggestions":["参考句式"]}。当前内容：\n${text}\n同类句式参考：\n${g}`;
+  const fl = FIELD_LABEL[field] || field;
+  if (mode === 'polish') return `你是中文简历助手。请把下面这段润色得更专业、量化、简洁。只返回 JSON {"text":"润色结果"}：\n${text}`;
+  if (mode === 'expand') return `你是中文简历助手，岗位「${roleTitle || fl}」。该字段为空，给 4-6 条可参考写法要点。只返回 JSON {"suggestions":["..."]}。同类句式参考：\n${g}`;
+  if (mode === 'guide') return `你是简历顾问。目标岗位「${roleTitle || '未指定'}」。给该岗位简历的填写思路。只返回 JSON {"advice":[{"tag":"岗位重点|建议技能|量化建议|常见误区","msg":"...","sev":"warn或空"}],"suggestions":["成果句式"]}。4-6 条 advice、5-8 条 suggestions。`;
+  if (mode === 'workgen') return `你是简历顾问。为「${roleTitle || '该岗位'}」生成 4-5 条工作经历要点：动词开头、含量化结果、通用可套用。只返回 JSON {"bullets":["...","..."]}。`;
+  if (mode === 'fill') return `你是中文简历助手。请为求职者撰写【${fl}】这段完整内容，岗位「${roleTitle || ''}」，贴合实际、尽量可量化、直接可用（3-5 句/条）。只返回 JSON {"text":"内容"}。同类句式参考：\n${g}`;
+  return `你是中文简历助手。字段「${fl}」。请检查并给建议。只返回 JSON {"advice":[{"tag":"","msg":"","sev":"warn或空"}],"suggestions":["参考句式"]}。当前内容：\n${text}\n同类句式参考：\n${g}`;
 }
 async function apiAiRun(req, res, body) {
-  const mode = ['check', 'expand', 'polish', 'guide', 'workgen'].includes(body.mode) ? body.mode : 'check';
+  const mode = ['check', 'expand', 'polish', 'guide', 'workgen', 'fill'].includes(body.mode) ? body.mode : 'check';
   const field = String(body.field || 'text').slice(0, 40);
   const text = String(body.text || '').slice(0, 4000);
   const profession = String(body.profession || '').slice(0, 60);
@@ -603,101 +632,27 @@ async function apiAiRun(req, res, body) {
   if (blocked(`ai|${ip}`, 60)) return send(res, 429, { error: 'AI 调用太频繁，请稍后再试' });
   const gloss = await glossFor(profession);
   const suggestions = gloss.slice(0, 6).map((g) => g.text);
+  const tpls = (await templates()).templates;
+  const it = String(body.intent || profession || '');
+  const tpl = tpls.find((t) => t.slug === profession)
+    || tpls.find((t) => profession && t.title && (profession.indexOf(t.title) >= 0 || t.title.indexOf(profession) >= 0))
+    || tpls.find((t) => t.title && it && it.indexOf(t.title.slice(0, 3)) >= 0);
+  const roleTitle = (tpl && tpl.title) || it || String(body.role || '') || '';
+  const glossRows = tpl ? await glossFor(tpl.slug) : gloss;
+  const sugs = (glossRows.length ? glossRows : gloss).slice(0, 8).map((g) => g.text);
 
-  if (mode === 'guide') {
-    const tpls = (await templates()).templates;
-    const it = String(body.intent || profession || '');
-    let tpl = tpls.find((t) => t.slug === profession)
-      || tpls.find((t) => profession && t.title && (profession.indexOf(t.title) >= 0 || t.title.indexOf(profession) >= 0))
-      || tpls.find((t) => t.title && it && it.indexOf(t.title.slice(0, 3)) >= 0);
-    const glossRows = tpl ? await glossFor(tpl.slug) : gloss;
-    const sugs = (glossRows.length ? glossRows : gloss).slice(0, 8).map((g) => g.text);
-    if (DASHSCOPE_KEY) {
-      try {
-        const prompt = `你是简历顾问。目标岗位：${(tpl && tpl.title) || it || '未指定'}。请给该岗位简历的填写思路。只返回 JSON：{"advice":[{"tag":"岗位重点|建议技能|量化建议|常见误区","msg":"...","sev":"warn或空"}],"suggestions":["该岗位可用的成果句式"]}。给 4-6 条 advice、5-8 条 suggestions。`;
-        const r = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DASHSCOPE_KEY}` },
-          body: JSON.stringify({ model: 'qwen-plus', temperature: 0.6, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }),
-        });
-        if (r.ok) {
-          const j = await r.json();
-          const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '{}';
-          let o = {}; try { o = JSON.parse(raw); } catch { o = {}; }
-          return send(res, 200, {
-            source: 'llm', text: '',
-            suggestions: Array.isArray(o.suggestions) ? o.suggestions.slice(0, 8).map(String) : sugs,
-            advice: Array.isArray(o.advice) ? o.advice.map((a) => ({ tag: String((a && a.tag) || '建议'), msg: String((a && a.msg) || ''), sev: a && a.sev === 'warn' ? 'warn' : '' })) : [],
-          });
-        }
-      } catch (e) { /* 落回规则 */ }
-    }
-    const advice = [];
-    if (tpl && tpl.summary) advice.push({ tag: '岗位重点', msg: tpl.summary, sev: '' });
-    const secs = Array.isArray(tpl && tpl.sections) ? tpl.sections : [];
-    if (secs.length) advice.push({ tag: '建议板块', msg: secs.map((s) => (typeof s === 'string' ? s : (s.title || s.name || ''))).filter(Boolean).join('、'), sev: '' });
-    advice.push({ tag: '量化建议', msg: '用数字说话：负责品类数、图纸/样件量、降本%、提效工时、项目规模与你的角色。', sev: '' });
-    advice.push({ tag: '常见误区', msg: '别写「负责/参与」等泛词，改成动词开头的成果句；技能要与岗位 JD 对齐。', sev: 'warn' });
-    return send(res, 200, { source: 'rule', text: '', suggestions: sugs, advice });
+  const o = await llmJSON(aiPrompt(mode, field, text, glossRows, roleTitle));
+  if (o) {
+    const provider = llmLabel();
+    if (mode === 'workgen') { const bl = Array.isArray(o.bullets) ? o.bullets.map(String).filter(Boolean).slice(0, 6) : []; if (bl.length) return send(res, 200, { source: 'llm', provider, text: '', bullets: bl, suggestions: [], advice: [] }); }
+    else if (mode === 'guide') return send(res, 200, { source: 'llm', provider, text: '', suggestions: Array.isArray(o.suggestions) ? o.suggestions.slice(0, 8).map(String) : sugs, advice: Array.isArray(o.advice) ? o.advice.map((a) => ({ tag: String((a && a.tag) || '建议'), msg: String((a && a.msg) || ''), sev: a && a.sev === 'warn' ? 'warn' : '' })) : [] });
+    else if (mode === 'fill') return send(res, 200, { source: 'llm', provider, text: String(o.text || ''), suggestions: [], advice: [] });
+    else return send(res, 200, { source: 'llm', provider, text: mode === 'polish' ? String(o.text || '') : '', suggestions: Array.isArray(o.suggestions) ? o.suggestions.slice(0, 6).map(String) : suggestions, advice: Array.isArray(o.advice) ? o.advice.map((a) => ({ tag: String((a && a.tag) || '建议'), msg: String((a && a.msg) || ''), sev: a && a.sev === 'warn' ? 'warn' : '' })) : ruleAdvice(field, text) });
   }
 
-  if (mode === 'workgen') {
-    const role = String(body.role || '').slice(0, 40);
-    const tpls = (await templates()).templates;
-    const it = String(body.intent || profession || '');
-    let tpl = tpls.find((t) => t.slug === profession)
-      || tpls.find((t) => profession && t.title && (profession.indexOf(t.title) >= 0 || t.title.indexOf(profession) >= 0))
-      || tpls.find((t) => t.title && it && it.indexOf(t.title.slice(0, 3)) >= 0);
-    const glossRows = tpl ? await glossFor(tpl.slug) : gloss;
-    const roleTitle = (tpl && tpl.title) || it || role || '该岗位';
-    if (DASHSCOPE_KEY) {
-      try {
-        const prompt = `你是简历顾问。为「${roleTitle}」岗位生成 4-5 条工作经历要点(bullets)：动词开头、含量化结果、通用可套用、贴合该岗位常见职责${role ? `，具体职位为${role}` : ''}。只返回 JSON {"bullets":["...","..."]}。`;
-        const r = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DASHSCOPE_KEY}` },
-          body: JSON.stringify({ model: 'qwen-plus', temperature: 0.7, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }),
-        });
-        if (r.ok) {
-          const j = await r.json();
-          const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '{}';
-          let o = {}; try { o = JSON.parse(raw); } catch { o = {}; }
-          const bl = Array.isArray(o.bullets) ? o.bullets.map(String).filter(Boolean).slice(0, 6) : [];
-          if (bl.length) return send(res, 200, { source: 'llm', text: '', bullets: bl, suggestions: [], advice: [] });
-        }
-      } catch (e) { /* 落回规则 */ }
-    }
-    const fromGloss = (glossRows.length ? glossRows : gloss).slice(0, 5).map((g) => g.text).filter(Boolean);
-    const generic = [
-      `负责${roleTitle}相关核心模块的方案设计与落地，把控进度与交付质量。`,
-      '主导关键指标优化，通过数据分析定位瓶颈并推动改进，达成可量化成果。',
-      '协同跨部门资源推进项目，沉淀标准化流程与文档，提升团队整体效率。',
-      `跟进${roleTitle}行业动态与最佳实践，持续迭代方法与工具。`,
-    ];
-    const bullets = (fromGloss.length >= 3 ? fromGloss : fromGloss.concat(generic)).slice(0, 5);
-    return send(res, 200, { source: 'rule', text: '', bullets, suggestions: [], advice: [] });
-  }
-
-  if (DASHSCOPE_KEY) {
-    try {
-      const r = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DASHSCOPE_KEY}` },
-        body: JSON.stringify({ model: 'qwen-plus', temperature: 0.6, messages: [{ role: 'user', content: aiPrompt(mode, field, text, gloss) }], response_format: { type: 'json_object' } }),
-      });
-      if (r.ok) {
-        const j = await r.json();
-        const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '{}';
-        let o = {}; try { o = JSON.parse(raw); } catch { o = {}; }
-        return send(res, 200, {
-          source: 'llm',
-          text: mode === 'polish' ? String(o.text || '') : '',
-          suggestions: Array.isArray(o.suggestions) ? o.suggestions.slice(0, 6).map(String) : suggestions,
-          advice: Array.isArray(o.advice) ? o.advice.map((a) => ({ tag: String((a && a.tag) || '建议'), msg: String((a && a.msg) || ''), sev: a && a.sev === 'warn' ? 'warn' : '' })) : ruleAdvice(field, text),
-        });
-      }
-    } catch (e) { /* 落回规则引擎 */ }
-  }
+  if (mode === 'guide') { const advice = []; if (tpl && tpl.summary) advice.push({ tag: '岗位重点', msg: tpl.summary, sev: '' }); const secs = Array.isArray(tpl && tpl.sections) ? tpl.sections : []; if (secs.length) advice.push({ tag: '建议板块', msg: secs.map((s) => (typeof s === 'string' ? s : (s.title || s.name || ''))).filter(Boolean).join('、'), sev: '' }); advice.push({ tag: '量化建议', msg: '用数字说话：负责品类数、图纸/样件量、降本%、提效工时、项目规模与你的角色。', sev: '' }); advice.push({ tag: '常见误区', msg: '别写「负责/参与」等泛词，改成动词开头的成果句；技能要与岗位 JD 对齐。', sev: 'warn' }); return send(res, 200, { source: 'rule', text: '', suggestions: sugs, advice }); }
+  if (mode === 'workgen') { const fromGloss = (glossRows.length ? glossRows : gloss).slice(0, 5).map((g) => g.text).filter(Boolean); const generic = [`负责${roleTitle || '该岗位'}相关核心模块的方案设计与落地，把控进度与交付质量。`, '主导关键指标优化，通过数据分析定位瓶颈并推动改进，达成可量化成果。', '协同跨部门资源推进项目，沉淀标准化流程与文档，提升团队整体效率。', `跟进${roleTitle || '本'}行业动态与最佳实践，持续迭代方法与工具。`]; const bullets = (fromGloss.length >= 3 ? fromGloss : fromGloss.concat(generic)).slice(0, 5); return send(res, 200, { source: 'rule', text: '', bullets, suggestions: [], advice: [] }); }
+  if (mode === 'fill') { const sen = glossRows.map((g) => g.text).filter(Boolean); let out = ''; if (field === 'summary') out = ((tpl && tpl.summary) ? tpl.summary + ' ' : '') + sen.slice(0, 2).join('；') + (sen.length ? '。' : ''); else if (field === 'tags') out = sen.slice(0, 8).join('、'); else out = sen.slice(0, 3).join('\n'); return send(res, 200, { source: 'rule', text: out, suggestions: [], advice: [] }); }
   return send(res, 200, { source: 'rule', text: '', suggestions, advice: ruleAdvice(field, text) });
 }
 
