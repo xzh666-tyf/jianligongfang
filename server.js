@@ -631,7 +631,9 @@ function llmLabel() { return ARK_KEY ? '豆包 · 真 AI' : (DASHSCOPE_KEY ? '�
 /* 统一大模型入口：优先豆包(火山方舟)，其次通义千问；返回解析后的 JSON 对象，失败返回 null */
 async function llmJSON(prompt) {
   const calls = [];
-  if (ARK_KEY) calls.push({ url: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', key: ARK_KEY, model: ARK_MODEL, extra: {} });
+  // 豆包 Seed 系列默认开启思维链，跨境调用耗时翻倍易超时；对 seed 模型显式关闭 thinking，直接出结果。
+  const arkExtra = /seed/i.test(ARK_MODEL) ? { thinking: { type: 'disabled' } } : {};
+  if (ARK_KEY) calls.push({ url: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', key: ARK_KEY, model: ARK_MODEL, extra: arkExtra });
   if (DASHSCOPE_KEY) calls.push({ url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', key: DASHSCOPE_KEY, model: 'qwen-plus', extra: { response_format: { type: 'json_object' } } });
   for (const c of calls) {
     try {
