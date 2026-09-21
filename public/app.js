@@ -184,9 +184,9 @@ const THEME_PRESETS = [
 ];
 const SECTION_TITLES = {
   base: '基本信息', education: '教育经历', work: '工作经历', projects: '项目经历',
-  skills: '专业技能', certs: '证书与荣誉', summary: '自我评价',
+  skills: '专业技能', certs: '证书与荣誉', summary: '自我评价', hobbies: '兴趣爱好',
 };
-const EN_TITLES = { 教育经历: 'EDUCATION', 工作经历: 'EXPERIENCE', 项目经历: 'PROJECTS', 专业技能: 'SKILLS', 证书与荣誉: 'CERTIFICATES & HONORS', 自我评价: 'SUMMARY' };
+const EN_TITLES = { 教育经历: 'EDUCATION', 工作经历: 'EXPERIENCE', 项目经历: 'PROJECTS', 专业技能: 'SKILLS', 证书与荣誉: 'CERTIFICATES & HONORS', 自我评价: 'SUMMARY', 兴趣爱好: 'INTERESTS' };
 /* 章节线性图标（24×24，stroke 描边），按板块 key 取用 */
 const SECTION_ICONS = {
   education: '<path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c0 1 2.5 2.5 5 2.5s5-1.5 5-2.5v-4"/><path d="M21 8v5"/>',
@@ -195,6 +195,7 @@ const SECTION_ICONS = {
   skills: '<path d="M14 6a4 4 0 0 0-5 5L4 16l4 4 5-5a4 4 0 0 0 5-5l-3 3-2-2 3-3z"/>',
   certs: '<circle cx="12" cy="9" r="5"/><path d="M9 13l-1 8 4-2 4 2-1-8"/>',
   summary: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  hobbies: '<path d="M12 20s-7-4.6-7-9.4A4.1 4.1 0 0 1 12 8a4.1 4.1 0 0 1 7 2.6C19 15.4 12 20 12 20z"/>',
 };
 const iconSvg = (key) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${SECTION_ICONS[key] || SECTION_ICONS.summary}</svg>`;
 const maskPhone = (v) => String(v).replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
@@ -249,9 +250,9 @@ function setPath(obj, path, val) {
 
 function blankData() {
   return {
-    base: { name: '', intent: '', city: '', phone: '', email: '', birth: '', years: '', site: '', photo: '', nation: '', polity: '', home: '', build: '', salary: '', available: '', license: '' },
+    base: { name: '', intent: '', city: '', phone: '', email: '', birth: '', years: '', site: '', photo: '', nation: '', polity: '', home: '', build: '', salary: '', available: '', license: '', wechat: '', qq: '', marital: '', eduLevel: '' },
     extra: [],
-    education: [], work: [], projects: [], skills: [], skillTags: [], certs: [], awards: [], summary: '', lang: 'zh',
+    education: [], work: [], projects: [], skills: [], skillTags: [], certs: [], awards: [], summary: '', hobbies: '', lang: 'zh',
   };
 }
 function blankResume(name = '未命名简历') {
@@ -415,6 +416,8 @@ const FIELDS = {
     [['姓名', 'name'], ['求职意向', 'intent']],
     [['现居城市', 'city'], ['出生年月', 'birth', 'month']],
     [['联系电话', 'phone'], ['邮箱', 'email', 'email']],
+    [['微信号', 'wechat'], ['QQ 号', 'qq']],
+    [['婚姻状况', 'marital', ['未婚', '已婚', '离异']], ['最高学历', 'eduLevel', ['大专', '本科', '硕士', '博士', '中专/高中']]],
     [['工作年限', 'years'], ['个人主页 / 作品', 'site']],
     [['民族', 'nation'], ['政治面貌', 'polity', ['群众', '共青团员', '中共党员', '民主党派']]],
     [['户籍', 'home'], ['身高 / 体重', 'build']],
@@ -543,6 +546,11 @@ function renderEditor() {
     <p class="hint" style="margin:6px 0 0">提示：写“能带来什么”，别写“吃苦耐劳”。量化比形容词有用。</p>
   </fieldset>`);
 
+  out.push(`<fieldset><legend>兴趣爱好</legend>
+    <input class="t" data-p="hobbies" placeholder="如：篮球、桌球、唱歌、摄影（一行，用顿号分隔）" value="${esc(d.hobbies || '')}" />
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:6px"><button class="mini" data-act="aifill" data-p="hobbies" data-field="hobbies">✨AI 填写</button></div>
+  </fieldset>`);
+
   out.push(`<fieldset><legend>版式与主题</legend>
     <div class="famlabel">简历主题</div>
     <div class="chips thgrp">${THEME_GROUPS.map((g) => `<button data-act="thgrp" data-g="${g}" class="${state.thGroup === g ? 'on' : ''}">${g}</button>`).join('')}</div>
@@ -620,7 +628,7 @@ function pageHTML(r, forPrint) {
   const hidden = t.hidden || [];
   const show = (k) => !hidden.includes(k);
   const info = [
-    ['电话', b.phone], ['邮箱', b.email], ['现居', b.city], ['出生', b.birth], ['民族', b.nation], ['政治面貌', b.polity],
+    ['电话', b.phone], ['邮箱', b.email], ['微信', b.wechat], ['QQ', b.qq], ['现居', b.city], ['婚姻', b.marital], ['学历', b.eduLevel], ['出生', b.birth], ['民族', b.nation], ['政治面貌', b.polity],
     ['户籍', b.home], ['身高体重', b.build], ['年限', b.years ? (/年|以内|以上/.test(b.years) ? b.years : b.years + ' 年') : ''], ['期望薪资', b.salary],
     ['到岗', b.available], ['驾照', b.license], ['主页', b.site],
   ].filter((x) => has(x[1])).concat((d.extra || []).filter((x) => has(x.k) && has(x.v)).map((x) => [x.k, x.v]));
@@ -696,6 +704,7 @@ function pageHTML(r, forPrint) {
     return a || w ? `<ul class="ul">${a}${w}</ul>` : '';
   };
   const sum = () => (has(d.summary) ? `<div class="infoline" style="white-space:pre-wrap">${esc(d.summary)}</div>` : '');
+  const hob = () => (has(d.hobbies) ? `<div class="infoline">${esc(d.hobbies)}</div>` : '');
 
   const main = [
     sec('education', '教育经历', edu),
@@ -704,6 +713,7 @@ function pageHTML(r, forPrint) {
     sec('skills', '专业技能', skl),
     sec('certs', '证书与荣誉', cert),
     sec('summary', '自我评价', sum),
+    sec('hobbies', '兴趣爱好', hob),
   ].join('');
 
   const cslot = (t.nameColor ? `--namec:${t.nameColor};` : '') + (t.intentColor ? `--intentc:${t.intentColor};` : '')
@@ -724,7 +734,7 @@ function pageHTML(r, forPrint) {
       <div class="secu">联系方式</div><div class="sb sb-contact">${shownInfo.map((x) => `<span class="ck">${esc(x[0])}</span><span class="cv">${esc(x[1])}</span>`).join('') || '—'}</div>`;
     return `<div class="${cls}" style="${vars};font-family:${family}">
       <div class="side" style="background:${t.accent}">${side}</div>
-      <div class="main">${[sec('education', '教育经历', edu), sec('work', '工作经历', work), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum)].join('')}</div></div>`;
+      <div class="main">${[sec('education', '教育经历', edu), sec('work', '工作经历', work), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum), sec('hobbies', '兴趣爱好', hob)].join('')}</div></div>`;
   }
   if (t.layout === 'magazine') {
     return `<div class="${cls}" style="${vars};font-family:${family}">${head}<div class="rule"></div><div class="body">${main}</div></div>`;

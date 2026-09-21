@@ -437,7 +437,7 @@ async function apiBatch(req, res, body, user) {
 async function aiStructureResume(text) {
   const t = String(text).slice(0, 12000);
   const prompt = `你是简历信息抽取引擎。把下面的简历纯文本解析成结构化 JSON，严格只返回 JSON、不要任何多余文字。字段结构：
-{"base":{"name":"","intent":"","city":"","phone":"","email":"","birth":"YYYY-MM","years":"","site":"","nation":"","polity":"","home":"","salary":"","available":"","license":""},
+{"base":{"name":"","intent":"","city":"","phone":"","email":"","wechat":"","qq":"","marital":"","eduLevel":"","birth":"YYYY-MM","years":"","site":"","nation":"","polity":"","home":"","salary":"","available":"","license":""},
 "education":[{"school":"","major":"","degree":"","start":"YYYY-MM","end":"YYYY-MM","note":""}],
 "work":[{"company":"","role":"","start":"YYYY-MM","end":"YYYY-MM","bullets":[""]}],
 "projects":[{"name":"","role":"","start":"YYYY-MM","end":"YYYY-MM","desc":""}],
@@ -445,25 +445,31 @@ async function aiStructureResume(text) {
 "skillTags":[""],
 "certs":[{"name":"","date":"YYYY-MM-DD"}],
 "awards":[""],
-"summary":""}
-规则：日期用 YYYY-MM（月份）或 YYYY-MM-DD；不确定的字段留空字符串或空数组；work 的 bullets 放该段工作的每条职责/成果要点；summary 放自我评价。文本如下：\n${t}`;
+"summary":"","hobbies":""}
+规则：
+1) 日期一律 YYYY-MM 或 YYYY-MM-DD；简历里没有的日期就留空字符串，绝不编造，也不要因为缺日期就丢掉这一条目。
+2) 只要有学校名或专业就放进 education；有公司名或职位就放进 work；有名称就放进 projects——即使没有起止时间也要保留该条目。
+3) 「校园经历/学生会/社团/志愿服务/社会实践」这类没有公司主体的经历，归入 projects（name=组织或活动名，role=担任角色，desc=要点）。
+4) work 的 bullets 放该段工作的每条职责/成果要点；summary 放自我评价；hobbies 用顿号分隔的兴趣/特长。
+5) 不确定的字段留空字符串或空数组。文本如下：\n${t}`;
   const o = await llmJSON(prompt);
   if (!o || typeof o !== 'object') return null;
   const arr = (x) => Array.isArray(x) ? x : [];
   const b = o.base || {};
   const base = {};
-  for (const k of ['name','intent','city','phone','email','birth','years','site','photo','nation','polity','home','build','salary','available','license']) base[k] = String(b[k] || '');
-  const education = arr(o.education).map((e) => ({ school: String(e.school || ''), major: String(e.major || ''), degree: String(e.degree || ''), start: String(e.start || ''), end: String(e.end || ''), note: String(e.note || '') })).filter((e) => e.school || e.major);
+  for (const k of ['name','intent','city','phone','email','birth','years','site','photo','nation','polity','home','build','salary','available','license','wechat','qq','marital','eduLevel']) base[k] = String(b[k] || '');
+  const education = arr(o.education).map((e) => ({ school: String(e.school || ''), major: String(e.major || ''), degree: String(e.degree || ''), start: String(e.start || ''), end: String(e.end || ''), note: String(e.note || '') })).filter((e) => e.school || e.major || e.degree);
   const work = arr(o.work).map((w) => ({ company: String(w.company || ''), role: String(w.role || ''), start: String(w.start || ''), end: String(w.end || ''), bullets: arr(w.bullets).map(String).filter(Boolean) })).filter((w) => w.company || w.role);
-  const projects = arr(o.projects).map((p) => ({ name: String(p.name || ''), role: String(p.role || ''), start: String(p.start || ''), end: String(p.end || ''), desc: String(p.desc || '') })).filter((p) => p.name);
+  const projects = arr(o.projects).map((p) => ({ name: String(p.name || ''), role: String(p.role || ''), start: String(p.start || ''), end: String(p.end || ''), desc: String(p.desc || '') })).filter((p) => p.name || p.role);
   const skills = arr(o.skills).map((s) => ({ name: String(s.name || ''), level: Math.max(0, Math.min(100, Number(s.level) || 60)) })).filter((s) => s.name);
   const skillTags = arr(o.skillTags).map(String).filter(Boolean);
   const certs = arr(o.certs).map((c) => ({ name: String(c.name || ''), date: String(c.date || ''), org: String(c.org || '') })).filter((c) => c.name);
   const awards = arr(o.awards).map(String).filter(Boolean);
   const summary = String(o.summary || '');
-  const hasAny = base.name || base.intent || education.length || work.length || projects.length || skills.length || skillTags.length || certs.length || summary;
+  const hobbies = String(o.hobbies || '');
+  const hasAny = base.name || base.intent || education.length || work.length || projects.length || skills.length || skillTags.length || certs.length || summary || hobbies;
   if (!hasAny) return null;
-  return { data: { base, extra: [], education, work, projects, skills, skillTags, certs, awards, summary, lang: 'zh' }, notes: ['AI 已识别并归类，请核对各板块'] };
+  return { data: { base, extra: [], education, work, projects, skills, skillTags, certs, awards, summary, hobbies, lang: 'zh' }, notes: ['AI 已识别并归类，请核对各板块'] };
 }
 async function apiImportParse(req, res, body) {
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'na';
@@ -653,7 +659,7 @@ async function llmJSON(prompt) {
   }
   return null;
 }
-const FIELD_LABEL = { summary: '自我评价', note: '主修课程/成绩', desc: '项目说明', bullet: '工作要点', tags: '技能标签', intent: '求职意向' };
+const FIELD_LABEL = { summary: '自我评价', hobbies: '兴趣爱好', note: '主修课程/成绩', desc: '项目说明', bullet: '工作要点', tags: '技能标签', intent: '求职意向' };
 function aiPrompt(mode, field, text, gloss, roleTitle) {
   const g = gloss.slice(0, 8).map((x) => x.text).join('\n');
   const fl = FIELD_LABEL[field] || field;
