@@ -4,6 +4,7 @@
   "buildCommand": "",
   "installCommand": "",
   "outputDirectory": "public",
+  "regions": ["sin1"],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" }
   ],

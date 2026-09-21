@@ -637,6 +637,7 @@ async function llmJSON(prompt) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${c.key}` },
         body: JSON.stringify(Object.assign({ model: c.model, temperature: 0.6, messages: [{ role: 'user', content: prompt }] }, c.extra)),
+        signal: AbortSignal.timeout(45000),
       });
       if (!r.ok) continue;
       const j = await r.json();
