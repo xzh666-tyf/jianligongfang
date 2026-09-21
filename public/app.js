@@ -125,6 +125,17 @@ const RESUME_THEMES = [
   { id: 'ip-warm', name: '图标·暖金', g: '图标专业', base: 'classic', accent: '#b5651d', titleStyle: 'icon', infoCols: 2, skillLevel: 'text' },
   { id: 'ats-plain', name: 'ATS 纯文本', g: '特殊', base: 'ats', accent: '#333333' },
   { id: 'co-navy', name: '稳重大方', g: '特殊', base: 'corporate', accent: '#35566b' },
+  /* —— 焕新批次（免费2 + 注册解锁若干）—— */
+  { id: 'nw-mist', name: '雾蓝细线', g: '极简', base: 'minimal', accent: '#5a7d9a', titleStyle: 'centerline', nameStyle: 'under' },
+  { id: 'nw-warm', name: '暖灰编号', g: '极简', base: 'minimal', accent: '#8a6f5a', titleStyle: 'numbered', tex: 'dots' },
+  { id: 'nw-navyl', name: '藏青侧条', g: '现代', base: 'modern', accent: '#1f3a5f', titleStyle: 'leftblock', nameStyle: 'big' },
+  { id: 'nw-morandi', name: '莫兰迪带', g: '现代', base: 'classic', accent: '#7f8c79', secondary: '#b0a79a', paperBg: '#f4f2ee', titleStyle: 'bar', tex: 'lines' },
+  { id: 'nw-celadon', name: '青瓷雅', g: '商务', base: 'classic', accent: '#4f7d72', titleStyle: 'icon', infoCols: 2, skillLevel: 'text' },
+  { id: 'nw-graphite', name: '石墨暗', g: '现代', base: 'modern', accent: '#6f9fbd', titleStyle: 'bar', dark: true },
+  { id: 'nw-blueprint', name: '蓝图网格', g: '图案', base: 'classic', accent: '#2f6f8f', titleStyle: 'underline', tex: 'grid' },
+  { id: 'nw-terracotta', name: '陶土色块', g: '商务', base: 'classic', accent: '#b5651d', companyColor: '#8a4416', titleStyle: 'leftblock', nameStyle: 'boxed' },
+  { id: 'nw-serifbig', name: '衬线大字', g: '编辑设计', base: 'classic', accent: '#1c1c1e', font: 'serif', nameStyle: 'serif', titleStyle: 'centerline' },
+  { id: 'nw-sidebar-in', name: '靛蓝内 sidebar', g: '侧栏', base: 'sidebar', accent: '#3b4a6b', skillLevel: 'text' },
 ];
 const THEME_GROUPS = ['全部', ...Array.from(new Set(RESUME_THEMES.map((t) => t.g)))];
 function themeObj(t) {
@@ -222,7 +233,17 @@ const state = {
   dirty: false,
   timer: null,
   dismissed: {},
+  plan: 'guest',
+  exportLeft: null,
+  guestExportLimit: 3,
 };
+const FREE_THEME_GROUPS = new Set(['极简']);
+const FREE_FONT_KEYS = new Set(['sans', 'hei']);
+const isGuestUser = () => !!state.me && state.me.role === 'guest';
+const isPro = () => !!state.me && state.me.role !== 'guest';
+const themeFree = (id) => { const t = RESUME_THEMES.find((x) => x.id === id); return !t || FREE_THEME_GROUPS.has(t.g); };
+const fontFree = (k) => FREE_FONT_KEYS.has(k);
+function upgradeNudge(msg) { toast(msg || '该功能需使用邀请码注册后解锁', true); setTimeout(() => openAuth('reg'), 500); }
 
 function load(k, dft) {
   try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? dft : v; } catch { return dft; }
@@ -556,8 +577,9 @@ function renderEditor() {
     <div class="chips thgrp">${THEME_GROUPS.map((g) => `<button data-act="thgrp" data-g="${g}" class="${state.thGroup === g ? 'on' : ''}">${g}</button>`).join('')}</div>
     <div class="thgrid">${RESUME_THEMES.filter((t) => state.thGroup === '全部' || t.g === state.thGroup).map((t) => {
       const th = themeObj(t);
-      return `<button class="thcard ${r.theme.themeId === t.id ? 'on' : ''}" data-act="theme" data-t="${t.id}" title="${t.name}">
-        <span class="sth">${mockThumb(th, th.layout)}</span><span class="stn">${t.name}</span></button>`;
+      const locked = isGuestUser() && !themeFree(t.id);
+      return `<button class="thcard ${r.theme.themeId === t.id ? 'on' : ''} ${locked ? 'locked' : ''}" data-act="theme" data-t="${t.id}" title="${t.name}${locked ? ' · 注册解锁' : ''}">
+        <span class="sth">${mockThumb(th, th.layout)}</span><span class="stn">${t.name}${locked ? ' 🔒' : ''}</span></button>`;
     }).join('')}</div>
     <div class="famlabel">配色预设</div>
     <div class="chips palrow">${THEME_PRESETS.map((p, pi) => `<button data-act="preset" data-pi="${pi}"><i style="background:${p.accent}"></i>${p.name}${p.dark ? ' 🌙' : ''}</button>`).join('')}</div>
@@ -591,7 +613,7 @@ function renderEditor() {
     <div class="row"><label>行距</label><input type="range" min="1.3" max="1.9" step="0.05" data-p="#theme.lh" value="${r.theme.lh}" /><span style="width:38px;font-size:12px">${r.theme.lh}</span></div>
     <div class="row"><label>字间距</label><input type="range" min="0" max="1.2" step="0.1" data-p="#theme.ls" value="${r.theme.ls}" /><span style="width:38px;font-size:12px">${r.theme.ls}px</span></div>
     <div class="row"><label>紧凑度</label><input type="range" min="0.7" max="1.3" step="0.05" data-p="#theme.dens" value="${r.theme.dens}" /></div>
-    <div class="row"><label>字体</label><select class="t" data-p="#theme.font">${FONTS.map(([k, t]) => `<option value="${k}" ${r.theme.font === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <div class="row"><label>字体</label><select class="t" data-p="#theme.font">${FONTS.map(([k, t]) => `<option value="${k}" ${r.theme.font === k ? 'selected' : ''} ${isGuestUser() && !fontFree(k) ? 'disabled' : ''}>${t}${isGuestUser() && !fontFree(k) ? ' 🔒' : ''}</option>`).join('')}</select>
       <label style="flex:0 0 60px">头像形状</label><select class="t" data-p="#theme.photo"><option value="rounded" ${r.theme.photo === 'rounded' ? 'selected' : ''}>圆角</option><option value="circle" ${r.theme.photo === 'circle' ? 'selected' : ''}>圆形</option><option value="square" ${r.theme.photo === 'square' ? 'selected' : ''}>直角</option></select></div>
     <div class="famlabel">显示哪些板块</div>
     <div class="grid2">${Object.keys(SECTION_TITLES).filter((k) => k !== 'base').map((k) =>
@@ -1263,11 +1285,21 @@ const statusCls = (s) => (['已 offer', '面试中'].includes(s) ? 'g' : ['不�
 
 /* --------------------------------------------------------------- 账号 */
 function renderAcct() {
+  const g = isGuestUser();
   $('#acct').innerHTML = state.me
-    ? `${state.me.role === 'admin' ? '<a class="mini" href="./admin.html">站长后台</a>' : ''}<span class="who"><b>${esc(state.me.username)}</b></span><button class="btn" id="btnLogout">退出</button>`
+    ? `${state.me.role === 'admin' ? '<a class="mini" href="./admin.html">站长后台</a>' : ''}` +
+      (g ? `<span class="who"><b>游客模式</b></span><button class="btn navy" id="btnAuth">注册解锁</button>`
+         : `<span class="who"><b>${esc(state.me.username)}</b></span><button class="btn" id="btnLogout">退出</button>`)
     : `<button class="btn navy" id="btnAuth">登录 / 注册</button>`;
   const bar = $('#guestBar');
-  if (bar) bar.hidden = !!state.me;
+  if (bar) {
+    const showBar = !state.me || isGuestUser();
+    bar.hidden = !showBar;
+    if (showBar) {
+      const left = state.exportLeft == null ? state.guestExportLimit : state.exportLeft;
+      bar.innerHTML = `<span>👤 游客可先试用。注册后解锁全部主题 / 配色 / 字体、不限导出、版本历史与在线分享。导出剩余 <b>${Math.max(0, left)}</b>/${state.guestExportLimit} 次。</span><button class="btn navy" id="btnAuth">用邀请码注册</button>`;
+    }
+  }
   $('#btnExport').disabled = !curResume();
 }
 function showAuthPane(name) {
@@ -1283,6 +1315,8 @@ async function afterAuth(json) {
   state.token = json.token;
   localStorage.setItem(LS_TOKEN, json.token);
   state.me = json.user;
+  state.plan = json.user && json.user.role !== 'guest' ? 'pro' : 'guest';
+  state.exportLeft = null;
   const guestList = state.guest.resumes.slice(0, 10);
   state.guest = { resumes: [], activeId: '' };
   saveGuest();
@@ -1297,6 +1331,13 @@ async function exportAs(kind) {
   const r = curResume();
   if (!r) return toast('先新建一份简历', true);
   if (kind === 'pdf') {
+    if (isGuestUser()) {
+      const n = Number(localStorage.getItem('rw.pdfn') || 0);
+      if (n >= (state.guestExportLimit || 3)) { upgradeNudge('游客导出次数已用完，注册后可不限次数导出 PDF / Word'); return; }
+      localStorage.setItem('rw.pdfn', String(n + 1));
+      state.exportLeft = Math.max(0, (state.guestExportLimit || 3) - (n + 1));
+      renderAcct();
+    }
     renderPreview();
     setTimeout(() => window.print(), 120);
     return toast('打印窗口里选「另存为 PDF」，纸张 A4、边距默认');
@@ -1314,9 +1355,12 @@ async function exportAs(kind) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resume: { name: r.name, theme: r.theme, data: r.data } }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || '导出失败');
-      download(await res.blob(), `${r.name}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      toast('Word 文件已下载');
+      if (!res.ok) { let j = {}; try { j = await res.json(); } catch (e) {} if (j && j.needRegister) { state.exportLeft = 0; renderAcct(); upgradeNudge(j.error || '游客导出次数已用完，注册后可不限次数导出'); } else throw new Error((j && j.error) || '导出失败'); }
+      else {
+        if (res.headers.get('X-Export-Left') != null) { state.exportLeft = Number(res.headers.get('X-Export-Left')); renderAcct(); }
+        download(await res.blob(), `${r.name}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        toast('Word 文件已下载');
+      }
     } catch (e) { toast(e.message, true); }
     return;
   }
@@ -1473,10 +1517,10 @@ function bind() {
     else if (act === 'skilladd') { d.skills.push({ name: '', level: 60 }); }
     else if (act === 'certadd') { d.certs.push({ name: '', date: '', org: '' }); }
     else if (act === 'extraadd') { d.extra.push({ k: '', v: '' }); }
-    else if (act === 'theme') { const th = RESUME_THEMES.find((x) => x.id === b.dataset.t); if (th) applyTheme(r, th); }
+    else if (act === 'theme') { const th = RESUME_THEMES.find((x) => x.id === b.dataset.t); if (!th) { /* noop */ } else if (!themeFree(th.id)) upgradeNudge('该主题需使用邀请码注册后解锁'); else applyTheme(r, th); }
     else if (act === 'thgrp') { state.thGroup = b.dataset.g; renderEditor(); return; }
-    else if (act === 'palette') { r.theme.accent = b.dataset.c; }
-    else if (act === 'preset') { const pr = THEME_PRESETS[Number(b.dataset.pi)] || {}; r.theme.accent = pr.accent; r.theme.secondary = pr.secondary; r.theme.secColor = pr.secColor; r.theme.tmColor = pr.tmColor; r.theme.paperBg = pr.paperBg; r.theme.dark = pr.dark; r.theme.themeId = ''; }
+    else if (act === 'palette') { if (isGuestUser()) { upgradeNudge('自定义配色需使用邀请码注册后解锁'); } else r.theme.accent = b.dataset.c; }
+    else if (act === 'preset') { if (isGuestUser()) { upgradeNudge('配色预设需使用邀请码注册后解锁'); } else { const pr = THEME_PRESETS[Number(b.dataset.pi)] || {}; r.theme.accent = pr.accent; r.theme.secondary = pr.secondary; r.theme.secColor = pr.secColor; r.theme.tmColor = pr.tmColor; r.theme.paperBg = pr.paperBg; r.theme.dark = pr.dark; r.theme.themeId = ''; } }
     else if (act === 'photo') { $('#filePhoto').click(); return; }
     else if (act === 'photodel') { d.base.photo = ''; }
     else if (act === 'ai') { openAiFor(b.dataset.p, b.dataset.field); return; }
@@ -1937,8 +1981,14 @@ async function boot() {
   if (shareCode) { runShareMode(shareCode); return; }
   bind();
   try {
+    if (!state.token) {
+      try { const gj = await API.call('/api/guest', { method: 'POST' }); state.token = gj.token; localStorage.setItem(LS_TOKEN, gj.token); } catch (e) { /* 领不到匿名账号则退回本地游客 */ }
+    }
     const [bs, full] = await Promise.all([API.call('/api/bootstrap'), API.call('/api/templates')]);
     state.me = bs.me || null;
+    state.plan = bs.plan || (state.me && state.me.role !== 'guest' ? 'pro' : 'guest');
+    state.guestExportLimit = bs.guestExportLimit || 3;
+    state.exportLeft = (bs.exportLeft == null ? null : bs.exportLeft);
     state.meta = { ...(bs.meta || {}), ...(full.meta || {}) };
     state.templates = full.templates || [];
     state.glossary = full.glossary || {};
