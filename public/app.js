@@ -240,7 +240,16 @@ const state = {
 const FREE_THEME_GROUPS = new Set(['极简']);
 const FREE_FONT_KEYS = new Set(['sans', 'hei']);
 const isGuestUser = () => !!state.me && state.me.role === 'guest';
-const isPro = () => !!state.me && state.me.role !== 'guest';
+const isFreeUser = () => !!state.me && state.me.role === 'free';
+const isLimited = () => !!state.me && (state.me.role === 'guest' || state.me.role === 'free');
+const isPro = () => !!state.me && !isLimited();
+/* 账号名显示：匿名游客与免费账号统一显示"游客"，免费档额外挂"免费"小标签；付费/站长显示真实用户名 */
+const acctNameHtml = () => {
+  if (!state.me) return '';
+  if (state.me.role === 'guest') return '<b>游客</b>';
+  if (state.me.role === 'free') return '<b>游客</b><span style="margin-left:6px;font-size:11px;padding:1px 7px;border-radius:999px;background:rgba(138,90,25,.14);color:#8a5a19;vertical-align:middle">免费</span>';
+  return '<b>' + esc(state.me.username) + '</b>';
+};
 const themeFree = (id) => { const t = RESUME_THEMES.find((x) => x.id === id); return !t || FREE_THEME_GROUPS.has(t.g); };
 const fontFree = (k) => FREE_FONT_KEYS.has(k);
 function upgradeNudge(msg) { toast(msg || '该功能需使用邀请码注册后解锁', true); setTimeout(() => openAuth('reg'), 500); }
@@ -1018,7 +1027,7 @@ async function renderMine() {
   }).join('') : '<p class="hint">还没有简历。可以到模板中心挑一个，或点顶栏「导入简历」把老简历灌进来。</p>';
   renderBatchBar();
   $('#guestTip').innerHTML = state.me
-    ? '当前登录：<b>' + esc(state.me.username) + '</b>。简历只归属这个账号，其他用户看不到。'
+    ? '当前登录：' + acctNameHtml() + '。简历只归属这个账号，其他用户看不到。'
     : '<b>游客模式</b>：内容只存在这台设备。注册账号后会自动带走；换电脑时用「导出 → 备份文件」搬家。<button class="mini" id="goAuth">注册 / 登录</button>';
   renderApps();
 }
@@ -1288,8 +1297,8 @@ function renderAcct() {
   const g = isGuestUser();
   $('#acct').innerHTML = state.me
     ? `${state.me.role === 'admin' ? '<a class="mini" href="./admin.html">站长后台</a>' : ''}` +
-      (g ? `<span class="who"><b>游客模式</b></span><button class="btn navy" id="btnAuth">注册解锁</button>`
-         : `<span class="who"><b>${esc(state.me.username)}</b></span><button class="btn" id="btnLogout">退出</button>`)
+      (g ? `<span class="who">${acctNameHtml()}</span><button class="btn navy" id="btnAuth">注册解锁</button>`
+         : `<span class="who">${acctNameHtml()}</span><button class="btn" id="btnLogout">退出</button>`)
     : `<button class="btn navy" id="btnAuth">登录 / 注册</button>`;
   const bar = $('#guestBar');
   if (bar) {
@@ -1301,6 +1310,9 @@ function renderAcct() {
     }
   }
   $('#btnExport').disabled = !curResume();
+  /* 受限档（游客/免费）隐藏"版本历史"入口，避免点进去报 403 */
+  const lim = isLimited();
+  ['#btnPrevVer', '#btnSaveVer'].forEach((s) => { const el = $(s); if (el) el.style.display = lim ? 'none' : ''; });
 }
 function showAuthPane(name) {
   $$('.auth-body').forEach((p) => { p.hidden = p.dataset.pane !== name; });
@@ -1924,6 +1936,7 @@ function showRestoreCode(code, again) {
 async function showVersions() {
   const r = curResume();
   if (!r) return;
+  if (isLimited()) { toast('版本历史需使用邀请码注册后解锁'); setTimeout(() => openAuth('reg'), 400); return; }
   if (!state.me) { $('#verMask').classList.add('on'); $('#verList').innerHTML = '<p class="hint">版本历史需要登录账号后开启。</p>'; return; }
   if (!r.serverId) { toast('先保存一次'); return; }
   const out = await API.call(`/api/resumes/${r.serverId}/versions`);
