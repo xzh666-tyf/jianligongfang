@@ -619,7 +619,7 @@ function pageHTML(r, forPrint) {
   const show = (k) => !hidden.includes(k);
   const info = [
     ['电话', b.phone], ['邮箱', b.email], ['现居', b.city], ['出生', b.birth], ['民族', b.nation], ['政治面貌', b.polity],
-    ['户籍', b.home], ['身高体重', b.build], ['年限', b.years ? b.years + ' 年' : ''], ['期望薪资', b.salary],
+    ['户籍', b.home], ['身高体重', b.build], ['年限', b.years ? (/年|以内|以上/.test(b.years) ? b.years : b.years + ' 年') : ''], ['期望薪资', b.salary],
     ['到岗', b.available], ['驾照', b.license], ['主页', b.site],
   ].filter((x) => has(x[1])).concat((d.extra || []).filter((x) => has(x.k) && has(x.v)).map((x) => [x.k, x.v]));
   const dropKeys = ['出生', '户籍', '身高体重', '驾照'];
