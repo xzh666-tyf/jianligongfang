@@ -253,7 +253,29 @@ const acctNameHtml = () => {
 };
 const themeFree = (id) => { const t = RESUME_THEMES.find((x) => x.id === id); return !t || FREE_THEME_GROUPS.has(t.g); };
 const fontFree = (k) => FREE_FONT_KEYS.has(k);
-function upgradeNudge(msg) { toast(msg || '该功能需使用邀请码注册后解锁', true); setTimeout(() => openAuth('reg'), 500); }
+function upgradeNudge(msg) { toast(msg || '该功能需填写邀请码解锁', true); setTimeout(() => openAuth('reg'), 500); }
+
+/* ----------------------------------------------------------- 撤销(Undo) */
+/* 每简历一份内存历史栈：结构性变更前快照 {data,theme,name}，undo 回退上一份。上限 40，刷新/切换简历即重置。 */
+let undoStack = [];
+let histKey = '';
+const UNDO_CAP = 40;
+function syncUndoBtn() { const b = $('#btnUndo'); if (b) { b.disabled = undoStack.length === 0; b.title = undoStack.length ? `撤销上一步（还剩 ${undoStack.length} 步，Ctrl+Z）` : '暂无可撤销的操作'; } }
+function pushHistory() {
+  const r = curResume(); if (!r) return;
+  try { undoStack.push(JSON.parse(JSON.stringify({ data: r.data, theme: r.theme, name: r.name }))); } catch { return; }
+  if (undoStack.length > UNDO_CAP) undoStack.shift();
+  syncUndoBtn();
+}
+function resetHistory(key) { undoStack = []; histKey = key; syncUndoBtn(); }
+function undo() {
+  const r = curResume(); if (!r) return toast('先新建一份简历', true);
+  if (!undoStack.length) return toast('没有可撤销的操作');
+  const s = undoStack.pop();
+  r.data = s.data; r.theme = s.theme; r.name = s.name;
+  renderEditor(); renderPreview(); renderSuggestions(); renderMine(); markDirty(); syncUndoBtn();
+  toast('已撤销上一步');
+}
 
 function load(k, dft) {
   try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? dft : v; } catch { return dft; }
@@ -310,6 +332,8 @@ function listFor() {
 function curResume() { return state.cur; }
 function setCur(r) {
   state.cur = r;
+  const key = r ? (r.serverId || r.id) : '';
+  if (key !== histKey) resetHistory(key);
   renderEditor();
   renderPreview();
   renderSuggestions();
@@ -1530,6 +1554,7 @@ function bind() {
     const act = b.dataset.act;
     const k = b.dataset.k;
     const i = Number(b.dataset.i);
+    if (['itemadd', 'itemdel', 'mvup', 'mvdn', 'btadd', 'btdel', 'skilladd', 'certadd', 'extraadd', 'photodel', 'theme', 'preset', 'palette'].includes(act)) pushHistory();
     if (act === 'itemadd') {
       d[k] = d[k] || [];
       d[k].push(k === 'work' ? { company: '', role: '', start: '', end: '', bullets: [''] }
@@ -1567,6 +1592,7 @@ function bind() {
       const c = document.createElement('canvas');
       c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      pushHistory();
       curResume().data.base.photo = c.toDataURL('image/jpeg', 0.85);
       renderEditor(); renderPreview(); markDirty();
       toast('头像已处理（本地压缩，不上传原图）');
@@ -1661,7 +1687,7 @@ function bind() {
         role: item.role || item.name || '',
       }) });
       const bl = Array.isArray(out.bullets) ? out.bullets : [];
-      if (bl.length) { item.bullets = bl; toast(out.source === 'llm' ? 'AI 已生成这段经历' : '已按岗位生成参考经历（可再编辑）'); }
+      if (bl.length) { pushHistory(); item.bullets = bl; toast(out.source === 'llm' ? 'AI 已生成这段经历' : '已按岗位生成参考经历（可再编辑）'); }
       else toast('没有生成内容', true);
     } catch (e) {
       toast(e.message, true);
@@ -1681,7 +1707,7 @@ function bind() {
         intent: (r.data.base && r.data.base.intent) || '',
       }) });
       const txt = (out.text || '').trim();
-      if (txt) { setPath(r.data, p, txt); toast(out.source === 'llm' ? 'AI 已填写' : '已生成参考内容（可再编辑）'); }
+      if (txt) { pushHistory(); setPath(r.data, p, txt); toast(out.source === 'llm' ? 'AI 已填写' : '已生成参考内容（可再编辑）'); }
       else toast('没有生成内容', true);
     } catch (e) {
       toast(e.message, true);
@@ -1731,6 +1757,7 @@ function bind() {
   $('#aiApply').addEventListener('click', () => {
     const r = curResume(); const v = $('#aiText').value.trim();
     if (!r || !v) return toast('没有可应用的内容', true);
+    pushHistory();
     setPath(r.data, aiCtx.p, v);
     renderEditor(); renderPreview(); renderSuggestions(); markDirty();
     $('#aiMask').classList.remove('on');
@@ -1797,6 +1824,7 @@ function bind() {
           <button class="del" data-shdel="${s.code}">撤销</button></div>`).join('') : '<p class="hint">还没有分享链接。</p>';
     } catch (e) { $('#shList').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; }
   }
+  const undoBtn = $('#btnUndo'); if (undoBtn) undoBtn.addEventListener('click', undo); syncUndoBtn();
   $('#btnShare').addEventListener('click', () => {
     if (!curResume()) return toast('先新建/打开一份简历', true);
     $('#shareMask').classList.add('on'); $('#shResult').innerHTML = ''; $('#shPass').value = ''; renderShares();
@@ -1827,6 +1855,7 @@ function bind() {
     const r = curResume();
     if (!r || !r.serverId) return toast('先保存一次', true);
     try {
+      pushHistory();
       await API.call(`/api/resumes/${r.serverId}/restore`, { method: 'POST', body: JSON.stringify({ version: Number(b.dataset.rv) }) });
       const rr = (await API.call('/api/resumes/' + r.serverId)).resume;
       setCur({ ...r, name: rr.name, layout: rr.layout, theme: { ...DEFAULT_THEME, ...(rr.theme || {}) }, data: { ...blankData(), ...(rr.data || {}) }, version: rr.version });
@@ -1937,6 +1966,11 @@ function bind() {
   });
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (curResume()) save(true); }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      const tag = document.activeElement ? document.activeElement.tagName : '';
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
+      e.preventDefault(); undo();
+    }
   });
   window.addEventListener('beforeunload', () => { if (state.dirty) save(); });
   window.addEventListener('resize', moveSegment);
