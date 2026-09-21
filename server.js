@@ -431,6 +431,38 @@ async function apiBatch(req, res, body, user) {
 }
 
 /* ------------------------------------------------------- 导入解析 */
+/* 用大模型把简历纯文本结构化成各板块（需已配置豆包/通义千问密钥） */
+async function aiStructureResume(text) {
+  const t = String(text).slice(0, 12000);
+  const prompt = `你是简历信息抽取引擎。把下面的简历纯文本解析成结构化 JSON，严格只返回 JSON、不要任何多余文字。字段结构：
+{"base":{"name":"","intent":"","city":"","phone":"","email":"","birth":"YYYY-MM","years":"","site":"","nation":"","polity":"","home":"","salary":"","available":"","license":""},
+"education":[{"school":"","major":"","degree":"","start":"YYYY-MM","end":"YYYY-MM","note":""}],
+"work":[{"company":"","role":"","start":"YYYY-MM","end":"YYYY-MM","bullets":[""]}],
+"projects":[{"name":"","role":"","start":"YYYY-MM","end":"YYYY-MM","desc":""}],
+"skills":[{"name":"","level":60}],
+"skillTags":[""],
+"certs":[{"name":"","date":"YYYY-MM-DD"}],
+"awards":[""],
+"summary":""}
+规则：日期用 YYYY-MM（月份）或 YYYY-MM-DD；不确定的字段留空字符串或空数组；work 的 bullets 放该段工作的每条职责/成果要点；summary 放自我评价。文本如下：\n${t}`;
+  const o = await llmJSON(prompt);
+  if (!o || typeof o !== 'object') return null;
+  const arr = (x) => Array.isArray(x) ? x : [];
+  const b = o.base || {};
+  const base = {};
+  for (const k of ['name','intent','city','phone','email','birth','years','site','photo','nation','polity','home','build','salary','available','license']) base[k] = String(b[k] || '');
+  const education = arr(o.education).map((e) => ({ school: String(e.school || ''), major: String(e.major || ''), degree: String(e.degree || ''), start: String(e.start || ''), end: String(e.end || ''), note: String(e.note || '') })).filter((e) => e.school || e.major);
+  const work = arr(o.work).map((w) => ({ company: String(w.company || ''), role: String(w.role || ''), start: String(w.start || ''), end: String(w.end || ''), bullets: arr(w.bullets).map(String).filter(Boolean) })).filter((w) => w.company || w.role);
+  const projects = arr(o.projects).map((p) => ({ name: String(p.name || ''), role: String(p.role || ''), start: String(p.start || ''), end: String(p.end || ''), desc: String(p.desc || '') })).filter((p) => p.name);
+  const skills = arr(o.skills).map((s) => ({ name: String(s.name || ''), level: Math.max(0, Math.min(100, Number(s.level) || 60)) })).filter((s) => s.name);
+  const skillTags = arr(o.skillTags).map(String).filter(Boolean);
+  const certs = arr(o.certs).map((c) => ({ name: String(c.name || ''), date: String(c.date || ''), org: String(c.org || '') })).filter((c) => c.name);
+  const awards = arr(o.awards).map(String).filter(Boolean);
+  const summary = String(o.summary || '');
+  const hasAny = base.name || base.intent || education.length || work.length || projects.length || skills.length || skillTags.length || certs.length || summary;
+  if (!hasAny) return null;
+  return { data: { base, extra: [], education, work, projects, skills, skillTags, certs, awards, summary, lang: 'zh' }, notes: ['AI 已识别并归类，请核对各板块'] };
+}
 async function apiImportParse(req, res, body) {
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'na';
   if (blocked(`import|${ip}`, 30)) return send(res, 429, { error: '导入太频繁，请稍后再试' });
@@ -450,6 +482,10 @@ async function apiImportParse(req, res, body) {
       else text = buf.toString('utf8');
     }
     if (!text.trim()) return send(res, 400, { error: '没有可解析的文字内容' });
+    if ((ARK_KEY || DASHSCOPE_KEY) && body.useAI !== false) {
+      const ai = await aiStructureResume(text);
+      if (ai) return send(res, 200, { kind, data: ai.data, notes: ai.notes, chars: text.length, source: 'ai' });
+    }
     const parsed = parseResumeText(text.slice(0, 40000));
     return send(res, 200, { kind, data: parsed.data, notes: parsed.notes, chars: text.length });
   } catch (e) {
