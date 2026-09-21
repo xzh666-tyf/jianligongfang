@@ -128,17 +128,17 @@
       <label>密码<input id="liPass" type="password" autocomplete="current-password" /></label>
       <button class="btn navy wide" id="doLogin">登录</button>
       <div class="switchrow">
-        <button data-go="reg">用邀请码注册 ›</button>
+        <button data-go="reg">免费注册 / 升级 ›</button>
         <button data-go="reset">忘记密码 ›</button>
       </div>
       <p class="fine">登录状态保留 30 天；同一账号在任意设备打开都是你的简历。</p>
     </div>
     <div class="auth-body" data-pane="reg" hidden>
       <button class="back" data-go="login">‹ 返回</button>
-      <h2>邀请码注册</h2>
+      <h2>注册</h2>
       <label>用户名或手机号<input id="rgName" placeholder="手机号仅作登录名，不发验证码" /></label>
       <label>密码<input id="rgPass" type="password" placeholder="至少 8 位" /></label>
-      <label>邀请码<input id="rgCode" placeholder="向页面拥有者索取" /></label>
+      <label>邀请码（选填）<input id="rgCode" placeholder="不填＝免费注册（基础档）；填写＝解锁全部功能" /></label>
       <button class="btn navy wide" id="doReg">注册并开始</button>
       <div class="switchrow">
         <button data-go="login">‹ 返回登录</button>

@@ -593,7 +593,7 @@ function renderEditor() {
     <div class="chips thgrp">${THEME_GROUPS.map((g) => `<button data-act="thgrp" data-g="${g}" class="${state.thGroup === g ? 'on' : ''}">${g}</button>`).join('')}</div>
     <div class="thgrid">${RESUME_THEMES.filter((t) => state.thGroup === '全部' || t.g === state.thGroup).map((t) => {
       const th = themeObj(t);
-      const locked = isGuestUser() && !themeFree(t.id);
+      const locked = isLimited() && !themeFree(t.id);
       return `<button class="thcard ${r.theme.themeId === t.id ? 'on' : ''} ${locked ? 'locked' : ''}" data-act="theme" data-t="${t.id}" title="${t.name}${locked ? ' · 注册解锁' : ''}">
         <span class="sth">${mockThumb(th, th.layout)}</span><span class="stn">${t.name}${locked ? ' 🔒' : ''}</span></button>`;
     }).join('')}</div>
@@ -629,7 +629,7 @@ function renderEditor() {
     <div class="row"><label>行距</label><input type="range" min="1.3" max="1.9" step="0.05" data-p="#theme.lh" value="${r.theme.lh}" /><span style="width:38px;font-size:12px">${r.theme.lh}</span></div>
     <div class="row"><label>字间距</label><input type="range" min="0" max="1.2" step="0.1" data-p="#theme.ls" value="${r.theme.ls}" /><span style="width:38px;font-size:12px">${r.theme.ls}px</span></div>
     <div class="row"><label>紧凑度</label><input type="range" min="0.7" max="1.3" step="0.05" data-p="#theme.dens" value="${r.theme.dens}" /></div>
-    <div class="row"><label>字体</label><select class="t" data-p="#theme.font">${FONTS.map(([k, t]) => `<option value="${k}" ${r.theme.font === k ? 'selected' : ''} ${isGuestUser() && !fontFree(k) ? 'disabled' : ''}>${t}${isGuestUser() && !fontFree(k) ? ' 🔒' : ''}</option>`).join('')}</select>
+    <div class="row"><label>字体</label><select class="t" data-p="#theme.font">${FONTS.map(([k, t]) => `<option value="${k}" ${r.theme.font === k ? 'selected' : ''} ${isLimited() && !fontFree(k) ? 'disabled' : ''}>${t}${isLimited() && !fontFree(k) ? ' 🔒' : ''}</option>`).join('')}</select>
       <label style="flex:0 0 60px">头像形状</label><select class="t" data-p="#theme.photo"><option value="rounded" ${r.theme.photo === 'rounded' ? 'selected' : ''}>圆角</option><option value="circle" ${r.theme.photo === 'circle' ? 'selected' : ''}>圆形</option><option value="square" ${r.theme.photo === 'square' ? 'selected' : ''}>直角</option></select></div>
     <div class="famlabel">显示哪些板块</div>
     <div class="grid2">${Object.keys(SECTION_TITLES).filter((k) => k !== 'base').map((k) =>
@@ -1303,19 +1303,25 @@ const statusCls = (s) => (['已 offer', '面试中'].includes(s) ? 'g' : ['不�
 
 /* --------------------------------------------------------------- 账号 */
 function renderAcct() {
-  const g = isGuestUser();
+  const adminLink = state.me && state.me.role === 'admin' ? '<a class="mini" href="./admin.html">站长后台</a>' : '';
+  const who = `<span class="who">${acctNameHtml()}</span>`;
+  let buttons = '';
+  if (isGuestUser()) buttons = '<button class="btn navy" data-goto="reg">免费注册 / 升级</button>';
+  else if (isFreeUser()) buttons = '<button class="btn navy" data-goto="reg">填写邀请码升级</button><button class="btn" id="btnLogout">退出</button>';
+  else if (state.me) buttons = '<button class="btn" id="btnLogout">退出</button>';
   $('#acct').innerHTML = state.me
-    ? `${state.me.role === 'admin' ? '<a class="mini" href="./admin.html">站长后台</a>' : ''}` +
-      (g ? `<span class="who">${acctNameHtml()}</span><button class="btn navy" id="btnAuth">注册解锁</button>`
-         : `<span class="who">${acctNameHtml()}</span><button class="btn" id="btnLogout">退出</button>`)
-    : `<button class="btn navy" id="btnAuth">登录 / 注册</button>`;
+    ? adminLink + who + buttons
+    : '<button class="btn navy" id="btnAuth">登录 / 注册</button>';
   const bar = $('#guestBar');
   if (bar) {
-    const showBar = !state.me || isGuestUser();
+    const showBar = !state.me || isLimited();
     bar.hidden = !showBar;
     if (showBar) {
       const left = state.exportLeft == null ? state.guestExportLimit : state.exportLeft;
-      bar.innerHTML = `<span>👤 游客可先试用。注册后解锁全部主题 / 配色 / 字体、不限导出、版本历史与在线分享。导出剩余 <b>${Math.max(0, left)}</b>/${state.guestExportLimit} 次。</span><button class="btn navy" id="btnAuth">用邀请码注册</button>`;
+      const remain = `导出剩余 <b>${Math.max(0, left)}</b>/${state.guestExportLimit} 次。`;
+      bar.innerHTML = isFreeUser()
+        ? `<span>🎁 当前为免费账号。填写邀请码升级后解锁全部主题 / 配色 / 字体、不限导出、版本历史与在线分享。${remain}</span><button class="btn navy" data-goto="reg">填写邀请码升级</button>`
+        : `<span>👤 游客可先试用，免费注册即可长期保存；填写邀请码升级后解锁全部主题 / 配色 / 字体、不限导出、版本历史与在线分享。${remain}</span><button class="btn navy" data-goto="reg">免费注册 / 升级</button><button class="btn" data-goto="login">已有账号，登录</button>`;
     }
   }
   $('#btnExport').disabled = !curResume();
@@ -1336,7 +1342,7 @@ async function afterAuth(json) {
   state.token = json.token;
   localStorage.setItem(LS_TOKEN, json.token);
   state.me = json.user;
-  state.plan = json.user && json.user.role !== 'guest' ? 'pro' : 'guest';
+  state.plan = json.user && (json.user.role === 'user' || json.user.role === 'admin') ? 'pro' : 'guest';
   state.exportLeft = null;
   const guestList = state.guest.resumes.slice(0, 10);
   state.guest = { resumes: [], activeId: '' };
@@ -1352,9 +1358,9 @@ async function exportAs(kind) {
   const r = curResume();
   if (!r) return toast('先新建一份简历', true);
   if (kind === 'pdf') {
-    if (isGuestUser()) {
+    if (isLimited()) {
       const n = Number(localStorage.getItem('rw.pdfn') || 0);
-      if (n >= (state.guestExportLimit || 3)) { upgradeNudge('游客导出次数已用完，注册后可不限次数导出 PDF / Word'); return; }
+      if (n >= (state.guestExportLimit || 3)) { upgradeNudge('导出次数已用完，填写邀请码升级后可不限次数导出 PDF / Word'); return; }
       localStorage.setItem('rw.pdfn', String(n + 1));
       state.exportLeft = Math.max(0, (state.guestExportLimit || 3) - (n + 1));
       renderAcct();
@@ -1538,10 +1544,10 @@ function bind() {
     else if (act === 'skilladd') { d.skills.push({ name: '', level: 60 }); }
     else if (act === 'certadd') { d.certs.push({ name: '', date: '', org: '' }); }
     else if (act === 'extraadd') { d.extra.push({ k: '', v: '' }); }
-    else if (act === 'theme') { const th = RESUME_THEMES.find((x) => x.id === b.dataset.t); if (!th) { /* noop */ } else if (!themeFree(th.id)) upgradeNudge('该主题需使用邀请码注册后解锁'); else applyTheme(r, th); }
+    else if (act === 'theme') { const th = RESUME_THEMES.find((x) => x.id === b.dataset.t); if (!th) { /* noop */ } else if (isLimited() && !themeFree(th.id)) upgradeNudge('该主题需填写邀请码解锁'); else applyTheme(r, th); }
     else if (act === 'thgrp') { state.thGroup = b.dataset.g; renderEditor(); return; }
-    else if (act === 'palette') { if (isGuestUser()) { upgradeNudge('自定义配色需使用邀请码注册后解锁'); } else r.theme.accent = b.dataset.c; }
-    else if (act === 'preset') { if (isGuestUser()) { upgradeNudge('配色预设需使用邀请码注册后解锁'); } else { const pr = THEME_PRESETS[Number(b.dataset.pi)] || {}; r.theme.accent = pr.accent; r.theme.secondary = pr.secondary; r.theme.secColor = pr.secColor; r.theme.tmColor = pr.tmColor; r.theme.paperBg = pr.paperBg; r.theme.dark = pr.dark; r.theme.themeId = ''; } }
+    else if (act === 'palette') { if (isLimited()) { upgradeNudge('自定义配色需填写邀请码解锁'); } else r.theme.accent = b.dataset.c; }
+    else if (act === 'preset') { if (isLimited()) { upgradeNudge('配色预设需填写邀请码解锁'); } else { const pr = THEME_PRESETS[Number(b.dataset.pi)] || {}; r.theme.accent = pr.accent; r.theme.secondary = pr.secondary; r.theme.secColor = pr.secColor; r.theme.tmColor = pr.tmColor; r.theme.paperBg = pr.paperBg; r.theme.dark = pr.dark; r.theme.themeId = ''; } }
     else if (act === 'photo') { $('#filePhoto').click(); return; }
     else if (act === 'photodel') { d.base.photo = ''; }
     else if (act === 'ai') { openAiFor(b.dataset.p, b.dataset.field); return; }
@@ -1883,6 +1889,7 @@ function bind() {
     if (b) openAuth(b.dataset.goto);
   });
   $('#acct').addEventListener('click', async (e) => {
+    const go = e.target.closest('[data-goto]'); if (go) return openAuth(go.dataset.goto);
     if (e.target.closest('#btnAuth')) return openAuth();
     if (!e.target.closest('#btnLogout')) return;
     try { await API.call('/api/me', { method: 'POST' }); } catch { /* 忽略 */ }
@@ -2008,7 +2015,7 @@ async function boot() {
     }
     const [bs, full] = await Promise.all([API.call('/api/bootstrap'), API.call('/api/templates')]);
     state.me = bs.me || null;
-    state.plan = bs.plan || (state.me && state.me.role !== 'guest' ? 'pro' : 'guest');
+    state.plan = bs.plan || (state.me && (state.me.role === 'user' || state.me.role === 'admin') ? 'pro' : 'guest');
     state.guestExportLimit = bs.guestExportLimit || 3;
     state.exportLeft = (bs.exportLeft == null ? null : bs.exportLeft);
     state.meta = { ...(bs.meta || {}), ...(full.meta || {}) };

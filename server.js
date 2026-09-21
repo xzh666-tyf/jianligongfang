@@ -95,10 +95,11 @@ async function currentUser(req) {
   return user;
 }
 
-/* ---- 游客/会员分级：guest=匿名账号（导出累计 3 次、锁定高级模板/字体、无分享/版本），user/admin=pro ---- */
+/* ---- 账号分级：受限档 = guest(匿名) / free(无邀请码注册)，全功能档 = user(邀请码) / admin ---- */
 const GUEST_EXPORT_LIMIT = 3;
 const isGuest = (u) => !!u && u.role === 'guest';
-const planOf = (u) => (u && u.role !== 'guest' ? 'pro' : 'guest');
+const isLimited = (u) => !!u && (u.role === 'guest' || u.role === 'free');
+const planOf = (u) => (u && (u.role === 'user' || u.role === 'admin') ? 'pro' : 'guest');
 async function guestExportCount(id) {
   const rows = await db('tpl_meta', { query: { select: 'value', key: `eq.export:${id}`, limit: 1 } });
   const v = rows && rows[0] && rows[0].value;
@@ -253,12 +254,17 @@ async function apiRegister(req, res, body, user) {
   if (!NAME_OK.test(username)) return send(res, 400, { error: '用户名需 3-24 位，可用中文、字母、数字、下划线' });
   if (password.length < 8) return send(res, 400, { error: '密码至少 8 位，建议字母加数字加符号' });
   if (password.length > 64) return send(res, 400, { error: '密码过长' });
-  if (!code) return send(res, 400, { error: '需要邀请码' });
 
-  const codes = await db('invite_codes', { query: { select: 'code,max_uses,used,enabled', code: `eq.${code}`, limit: 1 } });
-  const ic = codes && codes[0];
-  if (!ic || !ic.enabled) return send(res, 400, { error: '邀请码无效' });
-  if (ic.used >= ic.max_uses) return send(res, 400, { error: '邀请码名额已用完' });
+  /* 邀请码选填：填了且有效→ user(全功能，名额+1)；不填→ free(免费档，不占名额) */
+  let ic = null;
+  let targetRole = 'free';
+  if (code) {
+    const codes = await db('invite_codes', { query: { select: 'code,max_uses,used,enabled', code: `eq.${code}`, limit: 1 } });
+    ic = codes && codes[0];
+    if (!ic || !ic.enabled) return send(res, 400, { error: '邀请码无效' });
+    if (ic.used >= ic.max_uses) return send(res, 400, { error: '邀请码名额已用完' });
+    targetRole = 'user';
+  }
 
   const guestSelf = user && user.role === 'guest';
   const exist = await db('users', { query: { select: 'id', username: `eq.${username}`, limit: 1 } });
@@ -272,7 +278,7 @@ async function apiRegister(req, res, body, user) {
     // 就地升级：把匿名账号改名为正式账号，历史数据（同一 owner）原样保留
     const upd = await db('users', {
       method: 'PATCH', prefer: 'return=representation', query: { id: `eq.${user.id}` },
-      body: { username, pass_salt: salt, pass_hash: hashPassword(password, salt), restore_hash: hashPassword(restore, rSalt), restore_salt: rSalt, role: 'user', failed_count: 0, locked_until: null },
+      body: { username, pass_salt: salt, pass_hash: hashPassword(password, salt), restore_hash: hashPassword(restore, rSalt), restore_salt: rSalt, role: targetRole, failed_count: 0, locked_until: null },
     });
     const u2 = upd && upd[0];
     if (!u2) return send(res, 500, { error: '升级失败，请重试' });
@@ -281,7 +287,7 @@ async function apiRegister(req, res, body, user) {
   } else {
     const created = await db('users', {
       method: 'POST', prefer: 'return=representation',
-      body: { username, pass_salt: salt, pass_hash: hashPassword(password, salt), restore_hash: hashPassword(restore, rSalt), restore_salt: rSalt },
+      body: { username, pass_salt: salt, pass_hash: hashPassword(password, salt), restore_hash: hashPassword(restore, rSalt), restore_salt: rSalt, role: targetRole },
     });
     const u2 = created && created[0];
     if (!u2) return send(res, 500, { error: '注册失败，请重试' });
@@ -289,7 +295,7 @@ async function apiRegister(req, res, body, user) {
     const sess = await makeSession(uid);
     token = sess.token;
   }
-  await db('invite_codes', { method: 'PATCH', query: { code: `eq.${code}` }, body: { used: ic.used + 1 } });
+  if (ic) await db('invite_codes', { method: 'PATCH', query: { code: `eq.${code}` }, body: { used: ic.used + 1 } });
 
   const imported = [];
   const guest = body.guestData;
@@ -304,7 +310,7 @@ async function apiRegister(req, res, body, user) {
       imported.push(g.name || '未命名简历');
     }
   }
-  return send(res, 200, { token, user: { id: uid, username, role: 'user' }, restoreCode: restore, imported });
+  return send(res, 200, { token, user: { id: uid, username, role: targetRole }, restoreCode: restore, imported });
 }
 
 async function apiLogin(req, res, body) {
@@ -755,7 +761,7 @@ async function handleApi(req, res, url, user) {
     const t = await templates();
     const plan = planOf(user);
     let exportLeft = null;
-    if (isGuest(user)) exportLeft = Math.max(0, GUEST_EXPORT_LIMIT - (await guestExportCount(user.id)));
+    if (isLimited(user)) exportLeft = Math.max(0, GUEST_EXPORT_LIMIT - (await guestExportCount(user.id)));
     return send(res, 200, {
       me: user ? { id: user.id, username: user.username, role: user.role } : null,
       plan,
@@ -812,13 +818,13 @@ async function handleApi(req, res, url, user) {
   }
   const mDup = p.match(/^\/api\/resumes\/([\w-]+)\/(duplicate|restore)$/);
   if (mDup && req.method === 'POST') {
-    if (mDup[2] === 'restore' && isGuest(user)) return send(res, 403, { error: '版本回滚为注册用户功能，注册后解锁', needRegister: true });
+    if (mDup[2] === 'restore' && isLimited(user)) return send(res, 403, { error: '版本回滚需填写邀请码升级后解锁', needRegister: true });
     return mDup[2] === 'duplicate' ? apiDuplicate(req, res, user, mDup[1]) : apiRestore(req, res, body, user, mDup[1]);
   }
   const mVer = p.match(/^\/api\/resumes\/([\w-]+)\/versions$/);
   if (mVer && req.method === 'GET') {
     if (!user) return send(res, 401, { error: '请先登录' });
-    if (isGuest(user)) return send(res, 403, { error: '版本历史为注册用户功能，注册后解锁', needRegister: true });
+    if (isLimited(user)) return send(res, 403, { error: '版本历史需填写邀请码升级后解锁', needRegister: true });
     const r = await ownResume(req, user, mVer[1]);
     if (!r) return send(res, 404, { error: '简历不存在或无权限' });
     const rows = await db('resume_versions', {
@@ -842,9 +848,9 @@ async function handleApi(req, res, url, user) {
 
   if (p === '/api/export/docx' && req.method === 'POST') {
     let exportLeft = null;
-    if (isGuest(user)) {
+    if (isLimited(user)) {
       const used = await guestExportCount(user.id);
-      if (used >= GUEST_EXPORT_LIMIT) return send(res, 402, { error: '游客导出次数已用完，使用邀请码注册后可不限次数导出', needRegister: true, plan: 'guest', exportLimit: GUEST_EXPORT_LIMIT });
+      if (used >= GUEST_EXPORT_LIMIT) return send(res, 402, { error: '导出次数已用完，填写邀请码升级后可不限次数导出', needRegister: true, plan: 'guest', exportLimit: GUEST_EXPORT_LIMIT });
       await setGuestExportCount(user.id, used + 1);
       exportLeft = Math.max(0, GUEST_EXPORT_LIMIT - (used + 1));
     }
@@ -859,9 +865,9 @@ async function handleApi(req, res, url, user) {
     return send(res, 200, buf, headers);
   }
 
-  if (p === '/api/share' && req.method === 'POST') { if (isGuest(user)) return send(res, 403, { error: '在线分享为注册用户功能，注册后解锁', needRegister: true }); return apiShareCreate(req, res, body, user); }
-  if (p === '/api/share/mine' && req.method === 'GET') { if (isGuest(user)) return send(res, 403, { error: '在线分享为注册用户功能，注册后解锁', needRegister: true }); return apiShareMine(req, res, user); }
-  if (p === '/api/share/revoke' && req.method === 'POST') { if (isGuest(user)) return send(res, 403, { error: '在线分享为注册用户功能，注册后解锁', needRegister: true }); return apiShareRevoke(req, res, body, user); }
+  if (p === '/api/share' && req.method === 'POST') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码升级后解锁', needRegister: true }); return apiShareCreate(req, res, body, user); }
+  if (p === '/api/share/mine' && req.method === 'GET') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码升级后解锁', needRegister: true }); return apiShareMine(req, res, user); }
+  if (p === '/api/share/revoke' && req.method === 'POST') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码升级后解锁', needRegister: true }); return apiShareRevoke(req, res, body, user); }
   if (p === '/api/share/view' && req.method === 'GET') return apiShareView(req, res, url);
   if (p === '/api/ai/run' && req.method === 'POST') return apiAiRun(req, res, body);
 
