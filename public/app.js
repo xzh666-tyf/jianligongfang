@@ -194,14 +194,15 @@ const THEME_PRESETS = [
   { name: '藏青·金', accent: '#1f3a5f', secondary: '#b08d4f', secColor: '#1f3a5f', tmColor: '#8d8266', paperBg: '#ffffff', dark: false },
 ];
 const SECTION_TITLES = {
-  base: '基本信息', education: '教育经历', work: '工作经历', projects: '项目经历',
+  base: '基本信息', education: '教育经历', work: '工作经历', campus: '校园经历', projects: '项目经历',
   skills: '专业技能', certs: '证书与荣誉', summary: '自我评价', hobbies: '兴趣爱好',
 };
-const EN_TITLES = { 教育经历: 'EDUCATION', 工作经历: 'EXPERIENCE', 项目经历: 'PROJECTS', 专业技能: 'SKILLS', 证书与荣誉: 'CERTIFICATES & HONORS', 自我评价: 'SUMMARY', 兴趣爱好: 'INTERESTS' };
+const EN_TITLES = { 教育经历: 'EDUCATION', 工作经历: 'EXPERIENCE', 校园经历: 'CAMPUS', 项目经历: 'PROJECTS', 专业技能: 'SKILLS', 证书与荣誉: 'CERTIFICATES & HONORS', 自我评价: 'SUMMARY', 兴趣爱好: 'INTERESTS' };
 /* 章节线性图标（24×24，stroke 描边），按板块 key 取用 */
 const SECTION_ICONS = {
   education: '<path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c0 1 2.5 2.5 5 2.5s5-1.5 5-2.5v-4"/><path d="M21 8v5"/>',
   work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>',
+  campus: '<path d="M5 21V3"/><path d="M5 4h12l-2.2 3.5L17 11H5"/>',
   projects: '<path d="M4 5h11l5 5v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M15 5v5h5"/>',
   skills: '<path d="M14 6a4 4 0 0 0-5 5L4 16l4 4 5-5a4 4 0 0 0 5-5l-3 3-2-2 3-3z"/>',
   certs: '<circle cx="12" cy="9" r="5"/><path d="M9 13l-1 8 4-2 4 2-1-8"/>',
@@ -282,7 +283,7 @@ function blankData() {
   return {
     base: { name: '', intent: '', city: '', phone: '', email: '', birth: '', years: '', site: '', photo: '', nation: '', polity: '', home: '', build: '', salary: '', available: '', license: '', wechat: '', qq: '', marital: '', eduLevel: '' },
     extra: [],
-    education: [], work: [], projects: [], skills: [], skillTags: [], certs: [], awards: [], summary: '', hobbies: '', lang: 'zh',
+    education: [], work: [], projects: [], campus: [], skills: [], skillTags: [], certs: [], awards: [], summary: '', hobbies: '', lang: 'zh',
   };
 }
 function blankResume(name = '未命名简历') {
@@ -468,6 +469,11 @@ const FIELDS = {
     [['开始', 'start', 'month'], ['结束', 'end', 'month']],
     [['项目说明（背景 / 你的动作 / 结果）', 'desc', 'area']],
   ],
+  campus: [
+    [['组织 / 活动名称', 'name'], ['担任角色 / 职务', 'role']],
+    [['开始', 'start', 'month'], ['结束', 'end', 'month']],
+    [['主要职责与成果（做了什么 → 达成什么）', 'desc', 'area']],
+  ],
 };
 
 /* 预选选项：key → index.html 里的 datalist id。输入框仍可自由填写。 */
@@ -548,6 +554,7 @@ function renderEditor() {
 
   listBlock('education', '教育经历', null, FIELDS.education, false);
   listBlock('work', '工作经历（倒序，最近一份放最上）', null, FIELDS.work, true);
+  listBlock('campus', '校园经历（学生会 / 社团 / 志愿服务 / 社会实践）', null, FIELDS.campus, false);
   listBlock('projects', '项目经历', null, FIELDS.projects, false);
 
   out.push(`<fieldset><legend>专业技能</legend>
@@ -699,6 +706,7 @@ function pageHTML(r, forPrint) {
     return item(w, body);
   }).join('');
   const prj = () => (d.projects || []).map((p) => item(p, has(p.desc) ? `<div class="infoline">${esc(p.desc)}</div>` : '')).join('');
+  const cam = () => (d.campus || []).map((c) => item(c, has(c.desc) ? `<div class="infoline">${esc(c.desc)}</div>` : '')).join('');
   const skl = () => {
     const named = (d.skills || []).filter((s) => has(s.name));
     if (t.ats) {
@@ -740,6 +748,7 @@ function pageHTML(r, forPrint) {
   const main = [
     sec('education', '教育经历', edu),
     sec('work', '工作经历', work),
+    sec('campus', '校园经历', cam),
     sec('projects', '项目经历', prj),
     sec('skills', '专业技能', skl),
     sec('certs', '证书与荣誉', cert),
@@ -765,7 +774,7 @@ function pageHTML(r, forPrint) {
       <div class="secu">联系方式</div><div class="sb sb-contact">${shownInfo.map((x) => `<span class="ck">${esc(x[0])}</span><span class="cv">${esc(x[1])}</span>`).join('') || '—'}</div>`;
     return `<div class="${cls}" style="${vars};font-family:${family}">
       <div class="side" style="background:${t.accent}">${side}</div>
-      <div class="main">${[sec('education', '教育经历', edu), sec('work', '工作经历', work), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum), sec('hobbies', '兴趣爱好', hob)].join('')}</div></div>`;
+      <div class="main">${[sec('education', '教育经历', edu), sec('work', '工作经历', work), sec('campus', '校园经历', cam), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum), sec('hobbies', '兴趣爱好', hob)].join('')}</div></div>`;
   }
   if (t.layout === 'magazine') {
     return `<div class="${cls}" style="${vars};font-family:${family}">${head}<div class="rule"></div><div class="body">${main}</div></div>`;
@@ -814,7 +823,7 @@ function buildSuggestions() {
   if (!has(b.intent)) push('求职意向未填', '写清楚应聘岗位，例如「结构开发工程师」，别写「技术类岗位」。', () => focusField('base.intent'));
   if (has(b.phone) && !/^[\d+\-\s()]{7,20}$/.test(b.phone)) push('电话格式可疑', `当前填写：${b.phone}。建议用手机号，方便直接拨。`, () => focusField('base.phone'));
   if (has(b.email) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) push('邮箱格式可疑', `当前填写：${b.email}。注意别漏 @ 或域名后缀。`, () => focusField('base.email'));
-  if (!(d.work || []).length) push('缺工作经历', '至少写一段实习或工作，没有正式工作可用项目/课程设计代替。', () => go('edit'));
+  if (!(d.work || []).length && !(d.campus || []).length && !(d.projects || []).length) push('缺工作/校园经历', '至少写一段实习或工作；在校学生可用校园经历、项目 / 课程设计代替。', () => go('edit'));
   if ((d.work || []).length && !d.work.some((w) => (w.bullets || []).filter(has).length >= 3))
     push('每段经历建议 3 条要点', '少于 3 条会显得单薄。用「负责什么 → 怎么做 → 结果数字」三段式。', () => go('edit'), 'warn');
   const q = (d.work || []).some((w) => (w.bullets || []).some((x) => /\d+(\.\d+)?\s*(%|万|k|元|台|套|天|小时|人)/.test(String(x))));
@@ -1519,7 +1528,7 @@ function bind() {
       d[k] = d[k] || [];
       d[k].push(k === 'work' ? { company: '', role: '', start: '', end: '', bullets: [''] }
         : k === 'education' ? { school: '', major: '', degree: '', start: '', end: '', note: '' }
-          : k === 'projects' ? { name: '', role: '', start: '', end: '', desc: '' }
+          : (k === 'projects' || k === 'campus') ? { name: '', role: '', start: '', end: '', desc: '' }
             : k === 'skills' ? { name: '', level: 60 } : { name: '', date: '', org: '' });
     } else if (act === 'itemdel') { d[k].splice(i, 1); }
     else if (act === 'mvup' && i > 0) { [d[k][i - 1], d[k][i]] = [d[k][i], d[k][i - 1]]; }

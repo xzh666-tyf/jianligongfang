@@ -472,6 +472,7 @@ async function aiStructureResume(text) {
 "education":[{"school":"","major":"","degree":"","start":"YYYY-MM","end":"YYYY-MM","note":""}],
 "work":[{"company":"","role":"","start":"YYYY-MM","end":"YYYY-MM","bullets":[""]}],
 "projects":[{"name":"","role":"","start":"YYYY-MM","end":"YYYY-MM","desc":""}],
+"campus":[{"name":"","role":"","start":"YYYY-MM","end":"YYYY-MM","desc":""}],
 "skills":[{"name":"","level":60}],
 "skillTags":[""],
 "certs":[{"name":"","date":"YYYY-MM-DD"}],
@@ -480,7 +481,7 @@ async function aiStructureResume(text) {
 规则：
 1) 日期一律 YYYY-MM 或 YYYY-MM-DD；简历里没有的日期就留空字符串，绝不编造，也不要因为缺日期就丢掉这一条目。
 2) 只要有学校名或专业就放进 education；有公司名或职位就放进 work；有名称就放进 projects——即使没有起止时间也要保留该条目。
-3) 「校园经历/学生会/社团/志愿服务/社会实践」这类没有公司主体的经历，归入 projects（name=组织或活动名，role=担任角色，desc=要点）。
+3) 「校园经历/学校经历/学生会/社团/志愿服务/社会实践」这类在校期间的组织或活动经历（没有公司主体、不属于某个具体项目作品）归入 campus（name=组织或活动名，role=担任角色/职务，desc=主要职责与成果）。真正的项目/课题/作品集才归入 projects。
 4) work 的 bullets 放该段工作的每条职责/成果要点；summary 放自我评价；hobbies 用顿号分隔的兴趣/特长。
 5) 不确定的字段留空字符串或空数组。文本如下：\n${t}`;
   const o = await llmJSON(prompt);
@@ -492,15 +493,16 @@ async function aiStructureResume(text) {
   const education = arr(o.education).map((e) => ({ school: String(e.school || ''), major: String(e.major || ''), degree: String(e.degree || ''), start: String(e.start || ''), end: String(e.end || ''), note: String(e.note || '') })).filter((e) => e.school || e.major || e.degree);
   const work = arr(o.work).map((w) => ({ company: String(w.company || ''), role: String(w.role || ''), start: String(w.start || ''), end: String(w.end || ''), bullets: arr(w.bullets).map(String).filter(Boolean) })).filter((w) => w.company || w.role);
   const projects = arr(o.projects).map((p) => ({ name: String(p.name || ''), role: String(p.role || ''), start: String(p.start || ''), end: String(p.end || ''), desc: String(p.desc || '') })).filter((p) => p.name || p.role);
+  const campus = arr(o.campus).map((c) => ({ name: String(c.name || ''), role: String(c.role || ''), start: String(c.start || ''), end: String(c.end || ''), desc: String(c.desc || '') })).filter((c) => c.name || c.role);
   const skills = arr(o.skills).map((s) => ({ name: String(s.name || ''), level: Math.max(0, Math.min(100, Number(s.level) || 60)) })).filter((s) => s.name);
   const skillTags = arr(o.skillTags).map(String).filter(Boolean);
   const certs = arr(o.certs).map((c) => ({ name: String(c.name || ''), date: String(c.date || ''), org: String(c.org || '') })).filter((c) => c.name);
   const awards = arr(o.awards).map(String).filter(Boolean);
   const summary = String(o.summary || '');
   const hobbies = String(o.hobbies || '');
-  const hasAny = base.name || base.intent || education.length || work.length || projects.length || skills.length || skillTags.length || certs.length || summary || hobbies;
+  const hasAny = base.name || base.intent || education.length || work.length || projects.length || campus.length || skills.length || skillTags.length || certs.length || summary || hobbies;
   if (!hasAny) return null;
-  return { data: { base, extra: [], education, work, projects, skills, skillTags, certs, awards, summary, hobbies, lang: 'zh' }, notes: ['AI 已识别并归类，请核对各板块'] };
+  return { data: { base, extra: [], education, work, projects, campus, skills, skillTags, certs, awards, summary, hobbies, lang: 'zh' }, notes: ['AI 已识别并归类，请核对各板块'] };
 }
 async function apiImportParse(req, res, body) {
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'na';
