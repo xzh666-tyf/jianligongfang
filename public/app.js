@@ -504,7 +504,7 @@ function renderEditor() {
           : `<div class="grid2">${fieldHTML(row[0], `${key}.${i}`)}</div>`).join('');
       const bullets = bullet ? `<div class="bullets">${(it.bullets || []).map((b, bi) =>
         `<div class="brow"><textarea class="t" data-p="${key}.${i}.bullets.${bi}" placeholder="做了什么 → 怎么做 → 量化结果">${esc(b)}</textarea><button class="mini" data-act="ai" data-p="${key}.${i}.bullets.${bi}" data-field="bullet">✨AI</button><button class="del" data-act="btdel" data-p="${key}.${i}.bullets.${bi}">×</button></div>`).join('')}
-        <button class="mini" data-act="btadd" data-p="${key}.${i}.bullets">+ 加一条要点</button></div>` : '';
+        <button class="mini" data-act="workgen" data-k="${key}" data-i="${i}">✨AI 生成这段</button> <button class="mini" data-act="btadd" data-p="${key}.${i}.bullets">+ 加一条要点</button></div>` : '';
       return `<div class="itembox"><div class="ib-h"><span>第 ${i + 1} 条</span><span><button class="mini" data-act="mvup" data-k="${key}" data-i="${i}">↑</button> <button class="mini" data-act="mvdn" data-k="${key}" data-i="${i}">↓</button> <button class="del" data-act="itemdel" data-k="${key}" data-i="${i}">删除</button></span></div>${grid}${bullets}</div>`;
     }).join('');
     out.push(`<fieldset><legend>${title}</legend>${items || '<p class="hint" style="margin:0 0 8px">还没有条目。</p>'}
@@ -1469,6 +1469,7 @@ function bind() {
     else if (act === 'photodel') { d.base.photo = ''; }
     else if (act === 'ai') { openAiFor(b.dataset.p, b.dataset.field); return; }
     else if (act === 'guide') { openGuide(); return; }
+    else if (act === 'workgen') { genWork(b.dataset.k, Number(b.dataset.i), b); return; }
     renderEditor(); renderPreview(); renderSuggestions(); markDirty();
   });
 
@@ -1563,6 +1564,27 @@ function bind() {
     $('#aiResult').innerHTML = '<p class="fine">正在打开…</p>';
     $('#aiMask').classList.add('on');
     aiRunNow();
+  }
+  async function genWork(key, idx, btn) {
+    const r = curResume(); if (!r) return toast('先新建一份简历', true);
+    const item = (r.data[key] || [])[idx]; if (!item) return toast('先新建一段经历', true);
+    if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+    try {
+      const out = await API.call('/api/ai/run', { method: 'POST', body: JSON.stringify({
+        mode: 'workgen',
+        profession: r.profession || (r.data.base && r.data.base.intent) || '',
+        intent: (r.data.base && r.data.base.intent) || '',
+        role: item.role || item.name || '',
+      }) });
+      const bl = Array.isArray(out.bullets) ? out.bullets : [];
+      if (bl.length) { item.bullets = bl; toast(out.source === 'llm' ? 'AI 已生成这段经历' : '已按岗位生成参考经历（可再编辑）'); }
+      else toast('没有生成内容', true);
+    } catch (e) {
+      toast(e.message, true);
+      if (btn) { btn.disabled = false; btn.textContent = '✨AI 生成这段'; }
+      return;
+    }
+    renderEditor(); renderPreview(); renderSuggestions(); markDirty();
   }
   async function aiRunNow() {
     const r = curResume(); if (!r) return;

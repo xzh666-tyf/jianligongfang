@@ -595,7 +595,7 @@ function aiPrompt(mode, field, text, gloss) {
   return `${base}请检查并给建议。返回 JSON {"advice":[{"tag":"","msg":"","sev":"warn或空"}],"suggestions":["参考句式"]}。当前内容：\n${text}\n同类句式参考：\n${g}`;
 }
 async function apiAiRun(req, res, body) {
-  const mode = ['check', 'expand', 'polish', 'guide'].includes(body.mode) ? body.mode : 'check';
+  const mode = ['check', 'expand', 'polish', 'guide', 'workgen'].includes(body.mode) ? body.mode : 'check';
   const field = String(body.field || 'text').slice(0, 40);
   const text = String(body.text || '').slice(0, 4000);
   const profession = String(body.profession || '').slice(0, 60);
@@ -639,6 +639,43 @@ async function apiAiRun(req, res, body) {
     advice.push({ tag: '量化建议', msg: '用数字说话：负责品类数、图纸/样件量、降本%、提效工时、项目规模与你的角色。', sev: '' });
     advice.push({ tag: '常见误区', msg: '别写「负责/参与」等泛词，改成动词开头的成果句；技能要与岗位 JD 对齐。', sev: 'warn' });
     return send(res, 200, { source: 'rule', text: '', suggestions: sugs, advice });
+  }
+
+  if (mode === 'workgen') {
+    const role = String(body.role || '').slice(0, 40);
+    const tpls = (await templates()).templates;
+    const it = String(body.intent || profession || '');
+    let tpl = tpls.find((t) => t.slug === profession)
+      || tpls.find((t) => profession && t.title && (profession.indexOf(t.title) >= 0 || t.title.indexOf(profession) >= 0))
+      || tpls.find((t) => t.title && it && it.indexOf(t.title.slice(0, 3)) >= 0);
+    const glossRows = tpl ? await glossFor(tpl.slug) : gloss;
+    const roleTitle = (tpl && tpl.title) || it || role || '该岗位';
+    if (DASHSCOPE_KEY) {
+      try {
+        const prompt = `你是简历顾问。为「${roleTitle}」岗位生成 4-5 条工作经历要点(bullets)：动词开头、含量化结果、通用可套用、贴合该岗位常见职责${role ? `，具体职位为${role}` : ''}。只返回 JSON {"bullets":["...","..."]}。`;
+        const r = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DASHSCOPE_KEY}` },
+          body: JSON.stringify({ model: 'qwen-plus', temperature: 0.7, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '{}';
+          let o = {}; try { o = JSON.parse(raw); } catch { o = {}; }
+          const bl = Array.isArray(o.bullets) ? o.bullets.map(String).filter(Boolean).slice(0, 6) : [];
+          if (bl.length) return send(res, 200, { source: 'llm', text: '', bullets: bl, suggestions: [], advice: [] });
+        }
+      } catch (e) { /* 落回规则 */ }
+    }
+    const fromGloss = (glossRows.length ? glossRows : gloss).slice(0, 5).map((g) => g.text).filter(Boolean);
+    const generic = [
+      `负责${roleTitle}相关核心模块的方案设计与落地，把控进度与交付质量。`,
+      '主导关键指标优化，通过数据分析定位瓶颈并推动改进，达成可量化成果。',
+      '协同跨部门资源推进项目，沉淀标准化流程与文档，提升团队整体效率。',
+      `跟进${roleTitle}行业动态与最佳实践，持续迭代方法与工具。`,
+    ];
+    const bullets = (fromGloss.length >= 3 ? fromGloss : fromGloss.concat(generic)).slice(0, 5);
+    return send(res, 200, { source: 'rule', text: '', bullets, suggestions: [], advice: [] });
   }
 
   if (DASHSCOPE_KEY) {
