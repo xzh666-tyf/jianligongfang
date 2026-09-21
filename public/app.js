@@ -462,6 +462,8 @@ function fieldHTML(item, path) {
   return `<div class="f"><span>${esc(label)}</span><input class="t" data-p="${path}.${key}" value="${esc(val)}"${listAttr} /></div>`;
 }
 
+function _toISO(s){ if(!s) return ''; const m=String(s).match(/(\d{4})\D+(\d{1,2})(?:\D+(\d{1,2}))?/); if(!m) return ''; const y=m[1],mo=('0'+m[2]).slice(-2),d=('0'+(m[3]||'01')).slice(-2); return y+'-'+mo+'-'+d; }
+function _fmtDate(s){ if(!s) return ''; const m=String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return m[1]+'年'+(+m[2])+'月'+(+m[3])+'日'; return s; }
 function renderEditor() {
   const r = curResume();
   if (!r) { $('#editor').innerHTML = `<p class="hint">先「新建简历」或到模板中心挑一个模板。</p>`; return; }
@@ -528,7 +530,7 @@ function renderEditor() {
 
   out.push(`<fieldset><legend>证书与荣誉</legend>
     ${(d.certs || []).map((c, i) => `<div class="row"><input class="t" style="flex:2" data-p="certs.${i}.name" value="${esc(c.name)}" list="dl-cert" placeholder="证书名称" />
-      <input class="t" style="flex:1" data-p="certs.${i}.date" value="${esc(c.date)}" placeholder="取得时间" />
+      <input class="t" style="flex:1" type="date" data-p="certs.${i}.date" value="${esc(_toISO(c.date))}" title="取得时间" />
       <button class="del" data-act="itemdel" data-k="certs" data-i="${i}">删</button></div>`).join('')}
     <button class="mini" data-act="certadd">+ 加证书</button>
     <div class="famlabel">获奖（每行一条）</div>
@@ -689,7 +691,7 @@ function pageHTML(r, forPrint) {
     return bars + tags;
   };
   const cert = () => {
-    const a = (d.certs || []).filter((c) => has(c.name)).map((c) => `<li>${esc(c.name)}${has(c.date) ? `　<span style="color:#8d97a3">${esc(c.date)}</span>` : ''}</li>`).join('');
+    const a = (d.certs || []).filter((c) => has(c.name)).map((c) => `<li>${esc(c.name)}${has(c.date) ? `　<span style="color:#8d97a3">${esc(_fmtDate(c.date))}</span>` : ''}</li>`).join('');
     const w = (d.awards || []).filter(has).map((x) => `<li>${esc(x)}</li>`).join('');
     return a || w ? `<ul class="ul">${a}${w}</ul>` : '';
   };
