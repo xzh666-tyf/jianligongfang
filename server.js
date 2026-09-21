@@ -19,7 +19,9 @@ const SB = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const KEY = process.env.SUPABASE_ANON_KEY || '';
 const DASHSCOPE_KEY = (process.env.DASHSCOPE_API_KEY || '').trim();
 const ARK_KEY = (process.env.ARK_API_KEY || '').trim();
-const ARK_MODEL = (process.env.ARK_MODEL || 'doubao-pro-32k').trim();
+const ARK_MODEL_RAW = (process.env.ARK_MODEL || '').trim();
+// 兜底：默认用已开通的 dated 模型 id；若环境变量误留旧的 doubao-pro-32k（未开通会 404）也一并纠正
+const ARK_MODEL = (!ARK_MODEL_RAW || ARK_MODEL_RAW === 'doubao-pro-32k') ? 'doubao-seed-2-1-pro-260915' : ARK_MODEL_RAW;
 const SESSION_DAYS = 30;
 const MAX_BODY = 10 * 1024 * 1024;
 
