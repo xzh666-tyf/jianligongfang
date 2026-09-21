@@ -10,5 +10,8 @@
   },
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "unpdf": "^1.8.1"
   }
 }

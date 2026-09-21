@@ -8,7 +8,7 @@ import { join, extname, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
 import { buildDocx } from './lib/docx.js';
-import { parseResumeText, docxToText, pdfToText } from './lib/parse.js';
+import { parseResumeText, docxToText, pdfToText, extractPdfText } from './lib/parse.js';
 import { makeAdmin } from './lib/admin.js';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
@@ -480,7 +480,7 @@ async function apiImportParse(req, res, body) {
         return send(res, 200, { kind: 'json', resumes: Array.isArray(j.resumes) ? j.resumes : [], notes: ['备份文件，走导入而非解析'] });
       }
       if (fn.endsWith('.docx')) { text = docxToText(buf); kind = 'docx'; }
-      else if (fn.endsWith('.pdf')) { const pt = pdfToText(buf); if (!pt || pt.length < 20) return send(res, 400, { error: '这个 PDF 像是扫描件或提取不到文字，请改用「粘贴文本」' }); text = pt; kind = 'pdf'; }
+      else if (fn.endsWith('.pdf')) { const pt = await extractPdfText(buf); if (!pt || pt.length < 20) return send(res, 400, { error: '这个 PDF 像是扫描件或提取不到文字，请改用「粘贴文本」' }); text = pt; kind = 'pdf'; }
       else text = buf.toString('utf8');
     }
     if (!text.trim()) return send(res, 400, { error: '没有可解析的文字内容' });
