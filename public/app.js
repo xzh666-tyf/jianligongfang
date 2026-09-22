@@ -496,7 +496,7 @@ const FIELDS = {
   campus: [
     [['组织 / 活动名称', 'name'], ['担任角色 / 职务', 'role']],
     [['开始', 'start', 'month'], ['结束', 'end', 'month']],
-    [['主要职责与成果（做了什么 → 达成什么）', 'desc', 'area']],
+    [['主要职责与成果（做了什么 → 达成什么）', 'desc', 'area', 'campus']],
   ],
 };
 
@@ -510,11 +510,12 @@ const DL = {
 const DL_BY_LABEL = { '职位': 'dl-role', '担任角色': 'dl-role' };
 
 function fieldHTML(item, path) {
-  const [label, key, kind] = item;
+  const [label, key, kind, aiField] = item;
+  const af = aiField || key;
   const val = getPath(curResume().data, path + '.' + key);
   const dl = DL[key] || DL_BY_LABEL[label] || '';
   const listAttr = dl ? ` list="${dl}"` : '';
-  if (kind === 'area') return `<div class="f" style="grid-column:1/-1"><span>${esc(label)}</span><textarea class="t" data-p="${path}.${key}">${esc(val)}</textarea><span style="align-self:end;display:flex;gap:6px"><button class="mini" data-act="aifill" data-p="${path}.${key}" data-field="${key}">✨AI 填写</button><button class="mini" data-act="ai" data-p="${path}.${key}" data-field="${key}">✨AI 建议</button></span></div>`;
+  if (kind === 'area') return `<div class="f" style="grid-column:1/-1"><span>${esc(label)}</span><textarea class="t" data-p="${path}.${key}">${esc(val)}</textarea><span style="align-self:end;display:flex;gap:6px"><button class="mini" data-act="aifill" data-p="${path}.${key}" data-field="${af}">✨AI 填写</button><button class="mini" data-act="ai" data-p="${path}.${key}" data-field="${af}">✨AI 建议</button></span></div>`;
   if (kind === 'month') return `<div class="f"><span>${esc(label)}</span><input class="t" type="month" data-p="${path}.${key}" value="${esc(val)}" /></div>`;
   if (kind === 'email') return `<div class="f"><span>${esc(label)}</span><input class="t" type="email" data-p="${path}.${key}" value="${esc(val)}" placeholder="name@mail.com" /></div>`;
   if (Array.isArray(kind)) {

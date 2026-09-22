@@ -698,16 +698,28 @@ async function llmJSON(prompt) {
   }
   return null;
 }
-const FIELD_LABEL = { summary: '自我评价', hobbies: '兴趣爱好', note: '主修课程/成绩', desc: '项目说明', bullet: '工作要点', tags: '技能标签', intent: '求职意向' };
+const FIELD_LABEL = { summary: '自我评价', hobbies: '兴趣爱好', note: '主修课程/成绩', desc: '项目说明', campus: '校园经历', bullet: '工作要点', tags: '技能标签', intent: '求职意向' };
+/* 各板块的结构化填写范式（按板块 + 就业方向差异化） */
+const FILL_HINT = {
+  summary: '结构：从业年限/专业背景 → 2-3 项与岗位对齐的核心能力 → 一项代表性量化成果 → 求职动机。',
+  desc: '结构：项目背景/难点 → 你负责的动作 → 可量化结果。',
+  campus: '结构：组织或活动名称及你的角色 → 主要职责 → 一项成果或锻炼收获（参与人数 / 筹集金额 / 获奖等，尽量量化）。',
+  hobbies: '只挑与岗位气质、团队协作或自律相关的兴趣，点到为止，不要堆砌。',
+  bullet: '每条以动词开头，落到一个可量化结果（负责什么 → 怎么做 → 数字结果）。',
+  tags: '给 6-10 个与该岗位 JD 对齐的可检索硬技能关键词。',
+  intent: '写清目标岗位与方向，具体到岗职能，不要写泛词。',
+};
 function aiPrompt(mode, field, text, gloss, roleTitle) {
   const g = gloss.slice(0, 8).map((x) => x.text).join('\n');
   const fl = FIELD_LABEL[field] || field;
-  if (mode === 'polish') return `你是中文简历助手。请把下面这段润色得更专业、量化、简洁。只返回 JSON {"text":"润色结果"}：\n${text}`;
-  if (mode === 'expand') return `你是中文简历助手，岗位「${roleTitle || fl}」。该字段为空，给 4-6 条可参考写法要点。只返回 JSON {"suggestions":["..."]}。同类句式参考：\n${g}`;
+  const hint = FILL_HINT[field] || '';
+  const pos = roleTitle ? `面向「${roleTitle}」岗位` : '结合求职意向';
+  if (mode === 'polish') return `你是中文简历助手。${pos}，请把下面这段润色得更专业、量化、简洁。只返回 JSON {"text":"润色结果"}：\n${text}`;
+  if (mode === 'expand') return `你是中文简历助手，${pos}，字段【${fl}】。${hint} 该字段为空，给 4-6 条可参考写法要点，动词开头、尽量量化。只返回 JSON {"suggestions":["..."]}。同类句式参考：\n${g}`;
   if (mode === 'guide') return `你是简历顾问。目标岗位「${roleTitle || '未指定'}」。给该岗位简历的填写思路。只返回 JSON {"advice":[{"tag":"岗位重点|建议技能|量化建议|常见误区","msg":"...","sev":"warn或空"}],"suggestions":["成果句式"]}。4-6 条 advice、5-8 条 suggestions。`;
   if (mode === 'workgen') return `你是简历顾问。为「${roleTitle || '该岗位'}」生成 4-5 条工作经历要点：动词开头、含量化结果、通用可套用。只返回 JSON {"bullets":["...","..."]}。`;
-  if (mode === 'fill') return `你是中文简历助手。请为求职者撰写【${fl}】这段完整内容，岗位「${roleTitle || ''}」，贴合实际、尽量可量化、直接可用（3-5 句/条）。只返回 JSON {"text":"内容"}。同类句式参考：\n${g}`;
-  return `你是中文简历助手。字段「${fl}」。请检查并给建议。只返回 JSON {"advice":[{"tag":"","msg":"","sev":"warn或空"}],"suggestions":["参考句式"]}。当前内容：\n${text}\n同类句式参考：\n${g}`;
+  if (mode === 'fill') return `你是中文简历助手。请为求职者撰写【${fl}】这段完整内容，${pos}。${hint} 贴合实际、尽量可量化、直接可用（3-5 句/条）。只返回 JSON {"text":"内容"}。同类句式参考：\n${g}`;
+  return `你是中文简历助手。字段「${fl}」，${pos}。请检查并给建议。只返回 JSON {"advice":[{"tag":"","msg":"","sev":"warn或空"}],"suggestions":["参考句式"]}。当前内容：\n${text}\n同类句式参考：\n${g}`;
 }
 async function apiAiRun(req, res, body) {
   const mode = ['check', 'expand', 'polish', 'guide', 'workgen', 'fill'].includes(body.mode) ? body.mode : 'check';
