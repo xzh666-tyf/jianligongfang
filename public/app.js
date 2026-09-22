@@ -867,8 +867,12 @@ function renderPreview() {
 
 function completeness(r) {
   const d = r.data || {}; const b = d.base || {};
-  const checks = [has(b.name), has(b.intent), has(b.phone), has(b.email), (d.education || []).length, (d.work || []).length,
-    (d.work || []).some((w) => (w.bullets || []).filter(has).length >= 2), (d.skills || []).length + (d.skillTags || []).length >= 4,
+  const expN = (d.work || []).length + (d.campus || []).length;
+  const richExp = (d.work || []).some((w) => (w.bullets || []).filter(has).length >= 2)
+    || (d.campus || []).some((c) => String(c.desc || '').trim().length >= 18)
+    || (d.projects || []).some((p) => String(p.desc || '').trim().length >= 18);
+  const checks = [has(b.name), has(b.intent), has(b.phone), has(b.email), (d.education || []).length, expN > 0,
+    richExp, (d.skills || []).length + (d.skillTags || []).length >= 4,
     has(d.summary), (d.certs || []).length + (d.awards || []).length > 0];
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
