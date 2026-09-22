@@ -709,16 +709,26 @@ const FILL_HINT = {
   tags: '给 6-10 个与该岗位 JD 对齐的可检索硬技能关键词。',
   intent: '写清目标岗位与方向，具体到岗职能，不要写泛词。',
 };
+/* 各板块的具体范例（供模型参照结构、并在无词库时作为规则兜底内容）——校园经历与项目经历刻意给不同示例 */
+const FILL_EXAMPLE = {
+  campus: '例：任院学生会外联部部长，统筹 3 场校园招聘，对接 20+ 家企业，筹集赞助 5 万元、覆盖 2000+ 人次，团队获“优秀社团”。',
+  desc: '例：面向户外家具新品开发，主导某品类结构方案与公差设计，累计出图 120+ 张，样件一次通过率提升 30%、单件降本 8%。',
+  summary: '例：结构工程本科，2 年户外家具结构设计经验，熟悉 GD&T 与注塑/钣金工艺，可独立负责从打样到量产，习惯用数据衡量改善。',
+  hobbies: '例：篮球（院队成员）、半程马拉松完赛、风光摄影——体现自律与团队协作。',
+  bullet: '例：负责某品类的结构方案与图纸输出，打样轮次平均减少 40%。',
+  tags: '例：SolidWorks、AutoCAD、GD&T、公差分析、DFMEA、钣金/注塑工艺。',
+};
 function aiPrompt(mode, field, text, gloss, roleTitle) {
   const g = gloss.slice(0, 8).map((x) => x.text).join('\n');
   const fl = FIELD_LABEL[field] || field;
   const hint = FILL_HINT[field] || '';
+  const ex = FILL_EXAMPLE[field] ? `参考范例（数字请替换为真实）：${FILL_EXAMPLE[field]}。` : '';
   const pos = roleTitle ? `面向「${roleTitle}」岗位` : '结合求职意向';
   if (mode === 'polish') return `你是中文简历助手。${pos}，请把下面这段润色得更专业、量化、简洁。只返回 JSON {"text":"润色结果"}：\n${text}`;
-  if (mode === 'expand') return `你是中文简历助手，${pos}，字段【${fl}】。${hint} 该字段为空，给 4-6 条可参考写法要点，动词开头、尽量量化。只返回 JSON {"suggestions":["..."]}。同类句式参考：\n${g}`;
+  if (mode === 'expand') return `你是中文简历助手，${pos}，字段【${fl}】。${hint} ${ex} 该字段为空，给 4-6 条可参考写法要点，动词开头、尽量量化。只返回 JSON {"suggestions":["..."]}。同类句式参考：\n${g}`;
   if (mode === 'guide') return `你是简历顾问。目标岗位「${roleTitle || '未指定'}」。给该岗位简历的填写思路。只返回 JSON {"advice":[{"tag":"岗位重点|建议技能|量化建议|常见误区","msg":"...","sev":"warn或空"}],"suggestions":["成果句式"]}。4-6 条 advice、5-8 条 suggestions。`;
   if (mode === 'workgen') return `你是简历顾问。为「${roleTitle || '该岗位'}」生成 4-5 条工作经历要点：动词开头、含量化结果、通用可套用。只返回 JSON {"bullets":["...","..."]}。`;
-  if (mode === 'fill') return `你是中文简历助手。请为求职者撰写【${fl}】这段完整内容，${pos}。${hint} 贴合实际、尽量可量化、直接可用（3-5 句/条）。只返回 JSON {"text":"内容"}。同类句式参考：\n${g}`;
+  if (mode === 'fill') return `你是中文简历助手。请为求职者撰写【${fl}】这段完整内容，${pos}。${hint} ${ex} 贴合实际、尽量可量化、直接可用（3-5 句/条）。只返回 JSON {"text":"内容"}。同类句式参考：\n${g}`;
   return `你是中文简历助手。字段「${fl}」，${pos}。请检查并给建议。只返回 JSON {"advice":[{"tag":"","msg":"","sev":"warn或空"}],"suggestions":["参考句式"]}。当前内容：\n${text}\n同类句式参考：\n${g}`;
 }
 async function apiAiRun(req, res, body) {
@@ -750,7 +760,7 @@ async function apiAiRun(req, res, body) {
 
   if (mode === 'guide') { const advice = []; if (tpl && tpl.summary) advice.push({ tag: '岗位重点', msg: tpl.summary, sev: '' }); const secs = Array.isArray(tpl && tpl.sections) ? tpl.sections : []; if (secs.length) advice.push({ tag: '建议板块', msg: secs.map((s) => (typeof s === 'string' ? s : (s.title || s.name || ''))).filter(Boolean).join('、'), sev: '' }); advice.push({ tag: '量化建议', msg: '用数字说话：负责品类数、图纸/样件量、降本%、提效工时、项目规模与你的角色。', sev: '' }); advice.push({ tag: '常见误区', msg: '别写「负责/参与」等泛词，改成动词开头的成果句；技能要与岗位 JD 对齐。', sev: 'warn' }); return send(res, 200, { source: 'rule', text: '', suggestions: sugs, advice }); }
   if (mode === 'workgen') { const fromGloss = (glossRows.length ? glossRows : gloss).slice(0, 5).map((g) => g.text).filter(Boolean); const generic = [`负责${roleTitle || '该岗位'}相关核心模块的方案设计与落地，把控进度与交付质量。`, '主导关键指标优化，通过数据分析定位瓶颈并推动改进，达成可量化成果。', '协同跨部门资源推进项目，沉淀标准化流程与文档，提升团队整体效率。', `跟进${roleTitle || '本'}行业动态与最佳实践，持续迭代方法与工具。`]; const bullets = (fromGloss.length >= 3 ? fromGloss : fromGloss.concat(generic)).slice(0, 5); return send(res, 200, { source: 'rule', text: '', bullets, suggestions: [], advice: [] }); }
-  if (mode === 'fill') { const sen = glossRows.map((g) => g.text).filter(Boolean); let out = ''; if (field === 'summary') out = ((tpl && tpl.summary) ? tpl.summary + ' ' : '') + sen.slice(0, 2).join('；') + (sen.length ? '。' : ''); else if (field === 'tags') out = sen.slice(0, 8).join('、'); else out = sen.slice(0, 3).join('\n'); return send(res, 200, { source: 'rule', text: out, suggestions: [], advice: [] }); }
+  if (mode === 'fill') { const sen = glossRows.map((g) => g.text).filter(Boolean); let out = ''; if (field === 'summary') out = ((tpl && tpl.summary) ? tpl.summary + ' ' : '') + sen.slice(0, 2).join('；') + (sen.length ? '。' : ''); else if (field === 'tags') out = sen.slice(0, 8).join('、'); else out = sen.slice(0, 3).join('\n'); if (!out.trim()) out = FILL_EXAMPLE[field] || ''; return send(res, 200, { source: 'rule', text: out, suggestions: [], advice: [] }); }
   return send(res, 200, { source: 'rule', text: '', suggestions, advice: ruleAdvice(field, text) });
 }
 
