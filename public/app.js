@@ -255,26 +255,56 @@ const themeFree = (id) => { const t = RESUME_THEMES.find((x) => x.id === id); re
 const fontFree = (k) => FREE_FONT_KEYS.has(k);
 function upgradeNudge(msg) { toast(msg || '该功能需填写邀请码解锁', true); setTimeout(() => openAuth('reg'), 500); }
 
-/* ----------------------------------------------------------- 撤销(Undo) */
-/* 每简历一份内存历史栈：结构性变更前快照 {data,theme,name}，undo 回退上一份。上限 40，刷新/切换简历即重置。 */
+/* ----------------------------------------------------------- 撤销/重做(Undo/Redo) */
+/* 每简历一份历史栈：结构性变更前快照 {data,theme,name}。undo 回退、redo 前进；新增操作清空 redo。
+   用 sessionStorage 按简历 id 持久化，跨刷新可续（关标签页自动清空，避免占用与串号）。快照含头像会较大，栈上限收紧到 25，超配额时丢最旧再试。 */
 let undoStack = [];
+let redoStack = [];
 let histKey = '';
-const UNDO_CAP = 40;
-function syncUndoBtn() { const b = $('#btnUndo'); if (b) { b.disabled = undoStack.length === 0; b.title = undoStack.length ? `撤销上一步（还剩 ${undoStack.length} 步，Ctrl+Z）` : '暂无可撤销的操作'; } }
-function pushHistory() {
-  const r = curResume(); if (!r) return;
-  try { undoStack.push(JSON.parse(JSON.stringify({ data: r.data, theme: r.theme, name: r.name }))); } catch { return; }
-  if (undoStack.length > UNDO_CAP) undoStack.shift();
+const HIST_CAP = 25;
+const histStoreKey = () => 'rw.hist:' + histKey;
+function histSnap(r) { return JSON.parse(JSON.stringify({ data: r.data, theme: r.theme, name: r.name })); }
+function histApply(r, s) { r.data = s.data; r.theme = s.theme; r.name = s.name; }
+function persistHist() {
+  if (!histKey) return;
+  const write = () => sessionStorage.setItem(histStoreKey(), JSON.stringify({ u: undoStack, r: redoStack }));
+  try { write(); }
+  catch { undoStack = undoStack.slice(-(Math.ceil(HIST_CAP / 2))); try { write(); } catch { /* 仍失败则仅本会话内存可用 */ } }
+}
+function loadHist(key) {
+  histKey = key || '';
+  undoStack = []; redoStack = [];
+  try { const j = JSON.parse(sessionStorage.getItem(histStoreKey()) || '{}'); undoStack = Array.isArray(j.u) ? j.u : []; redoStack = Array.isArray(j.r) ? j.r : []; } catch { /* 无或损坏则空 */ }
   syncUndoBtn();
 }
-function resetHistory(key) { undoStack = []; histKey = key; syncUndoBtn(); }
+function syncUndoBtn() {
+  const u = $('#btnUndo'), rd = $('#btnRedo');
+  if (u) { u.disabled = undoStack.length === 0; u.title = undoStack.length ? `撤销上一步（还剩 ${undoStack.length} 步，Ctrl+Z）` : '暂无可撤销的操作'; }
+  if (rd) { rd.disabled = redoStack.length === 0; rd.title = redoStack.length ? `重做（Ctrl+Shift+Z 或 Ctrl+Y）` : '暂无可重做的操作'; }
+}
+function pushHistory() {
+  const r = curResume(); if (!r) return;
+  try { undoStack.push(histSnap(r)); } catch { return; }
+  if (undoStack.length > HIST_CAP) undoStack.shift();
+  redoStack = [];
+  persistHist(); syncUndoBtn();
+}
+function resetHistory(key) { loadHist(key); }
 function undo() {
   const r = curResume(); if (!r) return toast('先新建一份简历', true);
   if (!undoStack.length) return toast('没有可撤销的操作');
-  const s = undoStack.pop();
-  r.data = s.data; r.theme = s.theme; r.name = s.name;
-  renderEditor(); renderPreview(); renderSuggestions(); renderMine(); markDirty(); syncUndoBtn();
+  try { redoStack.push(histSnap(r)); } catch { redoStack = []; }
+  histApply(r, undoStack.pop());
+  renderEditor(); renderPreview(); renderSuggestions(); renderMine(); markDirty(); persistHist(); syncUndoBtn();
   toast('已撤销上一步');
+}
+function redo() {
+  const r = curResume(); if (!r) return toast('先新建一份简历', true);
+  if (!redoStack.length) return toast('没有可重做的操作');
+  try { undoStack.push(histSnap(r)); } catch { undoStack.shift(); undoStack.push(histSnap(r)); }
+  histApply(r, redoStack.pop());
+  renderEditor(); renderPreview(); renderSuggestions(); renderMine(); markDirty(); persistHist(); syncUndoBtn();
+  toast('已重做');
 }
 
 function load(k, dft) {
@@ -1825,7 +1855,8 @@ function bind() {
           <button class="del" data-shdel="${s.code}">撤销</button></div>`).join('') : '<p class="hint">还没有分享链接。</p>';
     } catch (e) { $('#shList').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; }
   }
-  const undoBtn = $('#btnUndo'); if (undoBtn) undoBtn.addEventListener('click', undo); syncUndoBtn();
+  const undoBtn = $('#btnUndo'); if (undoBtn) undoBtn.addEventListener('click', undo);
+  const redoBtn = $('#btnRedo'); if (redoBtn) redoBtn.addEventListener('click', redo); syncUndoBtn();
   $('#btnShare').addEventListener('click', () => {
     if (!curResume()) return toast('先新建/打开一份简历', true);
     $('#shareMask').classList.add('on'); $('#shResult').innerHTML = ''; $('#shPass').value = ''; renderShares();
@@ -1966,12 +1997,13 @@ function bind() {
     } catch (e) { toast(e.message, true); }
   });
   document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (curResume()) save(true); }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      const tag = document.activeElement ? document.activeElement.tagName : '';
-      if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
-      e.preventDefault(); undo();
-    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (curResume()) save(true); return; }
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return; /* 焦点在输入框时让位给原生文本撤销 */
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+    else if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); }
+    else if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); undo(); }
   });
   window.addEventListener('beforeunload', () => { if (state.dirty) save(); });
   window.addEventListener('resize', moveSegment);
