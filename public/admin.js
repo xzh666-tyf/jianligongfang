@@ -63,6 +63,32 @@ async function codes() {
      <td style="text-align:right"><button class="mini" data-act="tg" data-c="${esc(c.code)}" data-v="${c.enabled ? '0' : '1'}">${c.enabled ? '停用' : '启用'}</button></td></tr>`).join('')}</table>`;
 }
 
+let PURGE_IDS = [];
+async function purgePreview() {
+  const prefix = ($('#purgePrefix').value || '').trim();
+  if (prefix.length < 3) { $('#purgeResult').innerHTML = '<p class="hint">前缀至少 3 个字符，避免误伤全部账号。</p>'; return; }
+  const d = await api('users/purge-preview', { method: 'POST', body: { prefix } });
+  PURGE_IDS = (d.matches || []).map((m) => m.id);
+  $('#btnPurgeGo').disabled = d.count === 0;
+  $('#purgeConfirm').value = '';
+  $('#purgeConfirmRow').style.display = d.count ? 'flex' : 'none';
+  $('#purgeResult').innerHTML = d.count
+    ? `<p class="hint">前缀「${esc(d.prefix)}」匹配 <b>${d.count}</b> 个可删除账号（站长与你本人已自动排除）：</p>`
+      + `<table class="tr"><tr><th>用户名</th><th>角色</th><th>简历</th></tr>${d.matches.map((m) => `<tr><td>${esc(m.username)}</td><td><span class="pill">${esc(m.role)}</span></td><td>${m.resumes}</td></tr>`).join('')}</table>`
+    : `<p class="hint">前缀「${esc(d.prefix)}」没有匹配到可删除账号。</p>`;
+}
+async function purgeGo() {
+  if (!PURGE_IDS.length) return toast('请先点「预览匹配」', true);
+  if (($('#purgeConfirm').value || '').trim() !== 'PURGE') return toast('请输入大写 PURGE 二次确认', true);
+  if (!confirm(`确认删除这 ${PURGE_IDS.length} 个测试账号及其全部数据？此操作不可恢复。`)) return;
+  const d = await api('users/purge', { method: 'POST', body: { ids: PURGE_IDS, confirm: 'PURGE' } });
+  $('#purgeResult').innerHTML = `<p class="hint">已删除 ${d.count} 个：${(d.deleted || []).map(esc).join('、') || '（无）'}</p>`
+    + (d.skipped && d.skipped.length ? `<p class="hint">跳过：${d.skipped.map(esc).join('、')}</p>` : '');
+  $('#purgeConfirm').value = ''; $('#purgeConfirmRow').style.display = 'none';
+  PURGE_IDS = []; $('#btnPurgeGo').disabled = true;
+  users(); overview();
+}
+
 async function tplList() {
   const d = await api('templates');
   SLUGS = (d.templates || []).map((t) => ({ slug: t.slug, title: t.title }));
@@ -104,6 +130,8 @@ function bind() {
     location.href = './index.html';
   });
   $('#btnMark').addEventListener('click', () => api('mark-refresh', { method: 'POST', body: {} }).then(() => toast('已更新模板库时间戳')).catch((e) => toast(e.message, true)));
+  $('#btnPurgePrev').addEventListener('click', () => purgePreview().catch((e) => toast(e.message, true)));
+  $('#btnPurgeGo').addEventListener('click', () => purgeGo().catch((e) => toast(e.message, true)));
 
   $('#ncAdd').addEventListener('click', async () => {
     try {

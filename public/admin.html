@@ -57,6 +57,20 @@
 
   <section class="pane" data-p="users">
     <div class="box"><h3>账号列表</h3><div id="userTable"></div></div>
+    <div class="box">
+      <h3>批量清理测试用户（按用户名前缀）</h3>
+      <p class="hint">用于删除验证时留下的 <code>free_probe_*</code> / <code>cap_probe_*</code> 等测试账号，会连同其简历、历史版本、投递、分享、登录一起清除。<b>站长账号与当前登录的你受保护，绝不删除。</b>前缀至少 3 个字符。操作为两步：先预览、再输入 PURGE 确认。</p>
+      <div class="form" style="grid-template-columns:1fr auto auto">
+        <input id="purgePrefix" placeholder="用户名前缀，如 probe_ / cap_probe_ / free_ui_" />
+        <button class="mini" id="btnPurgePrev">预览匹配</button>
+        <button class="del" id="btnPurgeGo" disabled>删除匹配项</button>
+      </div>
+      <div id="purgeConfirmRow" style="margin-top:10px;display:none;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="hint">请手动输入大写 <b>PURGE</b> 二次确认：</span>
+        <input id="purgeConfirm" placeholder="PURGE" style="width:140px" />
+      </div>
+      <div id="purgeResult" style="margin-top:10px"></div>
+    </div>
   </section>
 
   <section class="pane" data-p="codes">
