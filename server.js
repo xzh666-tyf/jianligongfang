@@ -830,13 +830,13 @@ async function handleApi(req, res, url, user) {
   }
   const mDup = p.match(/^\/api\/resumes\/([\w-]+)\/(duplicate|restore)$/);
   if (mDup && req.method === 'POST') {
-    if (mDup[2] === 'restore' && isLimited(user)) return send(res, 403, { error: '版本回滚需填写邀请码升级后解锁', needRegister: true });
+    if (mDup[2] === 'restore' && isLimited(user)) return send(res, 403, { error: '版本回滚需填写邀请码解锁', needRegister: true });
     return mDup[2] === 'duplicate' ? apiDuplicate(req, res, user, mDup[1]) : apiRestore(req, res, body, user, mDup[1]);
   }
   const mVer = p.match(/^\/api\/resumes\/([\w-]+)\/versions$/);
   if (mVer && req.method === 'GET') {
     if (!user) return send(res, 401, { error: '请先登录' });
-    if (isLimited(user)) return send(res, 403, { error: '版本历史需填写邀请码升级后解锁', needRegister: true });
+    if (isLimited(user)) return send(res, 403, { error: '版本历史需填写邀请码解锁', needRegister: true });
     const r = await ownResume(req, user, mVer[1]);
     if (!r) return send(res, 404, { error: '简历不存在或无权限' });
     const rows = await db('resume_versions', {
@@ -862,7 +862,7 @@ async function handleApi(req, res, url, user) {
     let exportLeft = null;
     if (isLimited(user)) {
       const used = await guestExportCount(user.id);
-      if (used >= GUEST_EXPORT_LIMIT) return send(res, 402, { error: '导出次数已用完，填写邀请码升级后可不限次数导出', needRegister: true, plan: 'guest', exportLimit: GUEST_EXPORT_LIMIT });
+      if (used >= GUEST_EXPORT_LIMIT) return send(res, 402, { error: '导出次数已用完，填写邀请码解锁后可不限次数导出', needRegister: true, plan: 'guest', exportLimit: GUEST_EXPORT_LIMIT });
       await setGuestExportCount(user.id, used + 1);
       exportLeft = Math.max(0, GUEST_EXPORT_LIMIT - (used + 1));
     }
@@ -877,9 +877,9 @@ async function handleApi(req, res, url, user) {
     return send(res, 200, buf, headers);
   }
 
-  if (p === '/api/share' && req.method === 'POST') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码升级后解锁', needRegister: true }); return apiShareCreate(req, res, body, user); }
-  if (p === '/api/share/mine' && req.method === 'GET') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码升级后解锁', needRegister: true }); return apiShareMine(req, res, user); }
-  if (p === '/api/share/revoke' && req.method === 'POST') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码升级后解锁', needRegister: true }); return apiShareRevoke(req, res, body, user); }
+  if (p === '/api/share' && req.method === 'POST') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码解锁', needRegister: true }); return apiShareCreate(req, res, body, user); }
+  if (p === '/api/share/mine' && req.method === 'GET') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码解锁', needRegister: true }); return apiShareMine(req, res, user); }
+  if (p === '/api/share/revoke' && req.method === 'POST') { if (isLimited(user)) return send(res, 403, { error: '在线分享需填写邀请码解锁', needRegister: true }); return apiShareRevoke(req, res, body, user); }
   if (p === '/api/share/view' && req.method === 'GET') return apiShareView(req, res, url);
   if (p === '/api/ai/run' && req.method === 'POST') return apiAiRun(req, res, body);
 

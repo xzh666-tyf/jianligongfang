@@ -656,7 +656,7 @@ function renderEditor() {
     <div class="thgrid">${RESUME_THEMES.filter((t) => state.thGroup === '全部' || t.g === state.thGroup).map((t) => {
       const th = themeObj(t);
       const locked = isLimited() && !themeFree(t.id);
-      return `<button class="thcard ${r.theme.themeId === t.id ? 'on' : ''} ${locked ? 'locked' : ''}" data-act="theme" data-t="${t.id}" title="${t.name}${locked ? ' · 注册解锁' : ''}">
+      return `<button class="thcard ${r.theme.themeId === t.id ? 'on' : ''} ${locked ? 'locked' : ''}" data-act="theme" data-t="${t.id}" title="${t.name}${locked ? ' · 邀请码解锁' : ''}">
         <span class="sth">${mockThumb(th, th.layout)}</span><span class="stn">${t.name}${locked ? ' 🔒' : ''}</span></button>`;
     }).join('')}</div>
     <div class="famlabel">配色预设</div>
@@ -1387,8 +1387,8 @@ function renderAcct() {
       const left = state.exportLeft == null ? state.guestExportLimit : state.exportLeft;
       const remain = `导出剩余 <b>${Math.max(0, left)}</b>/${state.guestExportLimit} 次。`;
       bar.innerHTML = isFreeUser()
-        ? `<span>🎁 当前为免费账号。填写邀请码升级后解锁全部主题 / 配色 / 字体、不限导出、版本历史与在线分享。${remain}</span><button class="btn navy" data-goto="reg">填写邀请码升级</button>`
-        : `<span>👤 游客可先试用，免费注册即可长期保存；填写邀请码升级后解锁全部主题 / 配色 / 字体、不限导出、版本历史与在线分享。${remain}</span><button class="btn navy" data-goto="reg">免费注册 / 升级</button><button class="btn" data-goto="login">已有账号，登录</button>`;
+        ? `<span>🎁 当前为免费账号。填写邀请码升级可解锁全部高级主题、自定义配色 / 字体、不限导出、版本历史与在线分享。${remain}</span><button class="btn navy" data-goto="reg">填写邀请码升级</button>`
+        : `<span>👤 游客可先试用，免费注册即可长期保存；填写邀请码升级可解锁全部高级主题、自定义配色 / 字体、不限导出、版本历史与在线分享。${remain}</span><button class="btn navy" data-goto="reg">免费注册 / 升级</button><button class="btn" data-goto="login">已有账号，登录</button>`;
     }
   }
   $('#btnExport').disabled = !curResume();
@@ -1427,7 +1427,7 @@ async function exportAs(kind) {
   if (kind === 'pdf') {
     if (isLimited()) {
       const n = Number(localStorage.getItem('rw.pdfn') || 0);
-      if (n >= (state.guestExportLimit || 3)) { upgradeNudge('导出次数已用完，填写邀请码升级后可不限次数导出 PDF / Word'); return; }
+      if (n >= (state.guestExportLimit || 3)) { upgradeNudge('导出次数已用完，填写邀请码解锁后可不限次数导出 PDF / Word'); return; }
       localStorage.setItem('rw.pdfn', String(n + 1));
       state.exportLeft = Math.max(0, (state.guestExportLimit || 3) - (n + 1));
       renderAcct();
@@ -1449,7 +1449,7 @@ async function exportAs(kind) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resume: { name: r.name, theme: r.theme, data: r.data } }),
       });
-      if (!res.ok) { let j = {}; try { j = await res.json(); } catch (e) {} if (j && j.needRegister) { state.exportLeft = 0; renderAcct(); upgradeNudge(j.error || '游客导出次数已用完，注册后可不限次数导出'); } else throw new Error((j && j.error) || '导出失败'); }
+      if (!res.ok) { let j = {}; try { j = await res.json(); } catch (e) {} if (j && j.needRegister) { state.exportLeft = 0; renderAcct(); upgradeNudge(j.error || '导出次数已用完，填写邀请码解锁后可不限次数导出'); } else throw new Error((j && j.error) || '导出失败'); }
       else {
         if (res.headers.get('X-Export-Left') != null) { state.exportLeft = Number(res.headers.get('X-Export-Left')); renderAcct(); }
         download(await res.blob(), `${r.name}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
@@ -2031,7 +2031,7 @@ function showRestoreCode(code, again) {
 async function showVersions() {
   const r = curResume();
   if (!r) return;
-  if (isLimited()) { toast('版本历史需使用邀请码注册后解锁'); setTimeout(() => openAuth('reg'), 400); return; }
+  if (isLimited()) { toast('版本历史需填写邀请码解锁'); setTimeout(() => openAuth('reg'), 400); return; }
   if (!state.me) { $('#verMask').classList.add('on'); $('#verList').innerHTML = '<p class="hint">版本历史需要登录账号后开启。</p>'; return; }
   if (!r.serverId) { toast('先保存一次'); return; }
   const out = await API.call(`/api/resumes/${r.serverId}/versions`);
