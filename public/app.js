@@ -265,6 +265,13 @@ const HIST_CAP = 25;
 const histStoreKey = () => 'rw.hist:' + histKey;
 function histSnap(r) { return JSON.parse(JSON.stringify({ data: r.data, theme: r.theme, name: r.name })); }
 function histApply(r, s) { r.data = s.data; r.theme = s.theme; r.name = s.name; }
+/* 新建简历先以客户端 id 存历史，首次保存到服务端会换成 serverId；此处把 sessionStorage 与 histKey 一并迁移，保证刷新后仍能按稳定 key 还原栈 */
+function rekeyHist(oldId, newId) {
+  oldId = String(oldId == null ? '' : oldId); newId = String(newId == null ? '' : newId);
+  if (!oldId || !newId || oldId === newId) return;
+  try { const o = 'rw.hist:' + oldId, n = 'rw.hist:' + newId; const v = sessionStorage.getItem(o); if (v != null && sessionStorage.getItem(n) == null) sessionStorage.setItem(n, v); sessionStorage.removeItem(o); } catch { /* 配额或不可用忽略 */ }
+  if (histKey === oldId) histKey = newId;
+}
 function persistHist() {
   if (!histKey) return;
   const write = () => sessionStorage.setItem(histStoreKey(), JSON.stringify({ u: undoStack, r: redoStack }));
@@ -1030,6 +1037,7 @@ async function save(manual) {
     if (!r.serverId) {
       const out = await API.call('/api/resumes', { method: 'POST', body: JSON.stringify({ name: r.name, layout: r.layout, theme: { ...r.theme, profession: r.profession || '' }, data: r.data, score: completeness(r), label: r.label || '' }) });
       r.serverId = out.resume.id;
+      rekeyHist(r.id, r.serverId);
       r.version = out.resume.version;
       state.resumes.unshift({ ...out.resume });
     } else {
