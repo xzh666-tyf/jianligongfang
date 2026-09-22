@@ -13,7 +13,7 @@ const API = {
     const txt = await res.text();
     let json = null;
     try { json = txt ? JSON.parse(txt) : null; } catch { json = { error: txt.slice(0, 180) }; }
-    if (!res.ok) throw new Error((json && json.error) || '请求失败 ' + res.status);
+    if (!res.ok) { const err = new Error((json && json.error) || '请求失败 ' + res.status); err.status = res.status; err.data = json; throw err; }
     return json;
   },
 };
@@ -1053,9 +1053,10 @@ async function save(manual) {
     $('#saveState').textContent = '已保存 ' + now();
     if (manual) toast('已存为一个版本，可在「版本历史」回退');
   } catch (e) {
-    $('#saveState').textContent = '保存失败';
+    $('#saveState').textContent = '未保存';
     $('#saveState').className = 'save err';
-    toast(e.message, true);
+    if (e.data && e.data.needRegister) { renderAcct(); upgradeNudge(e.message || '已达免费份数上限，填写邀请码解锁不限份数'); }
+    else toast(e.message, true);
   }
 }
 

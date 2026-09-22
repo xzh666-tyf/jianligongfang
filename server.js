@@ -97,6 +97,7 @@ async function currentUser(req) {
 
 /* ---- 账号分级：受限档 = guest(匿名) / free(无邀请码注册)，全功能档 = user(邀请码) / admin ---- */
 const GUEST_EXPORT_LIMIT = 3;
+const FREE_RESUME_LIMIT = 3; /* 受限档(guest/free)最多保存的简历份数，超出引导填写邀请码解锁 */
 const isGuest = (u) => !!u && u.role === 'guest';
 const isLimited = (u) => !!u && (u.role === 'guest' || u.role === 'free');
 const planOf = (u) => (u && (u.role === 'user' || u.role === 'admin') ? 'pro' : 'guest');
@@ -107,6 +108,18 @@ async function guestExportCount(id) {
 }
 async function setGuestExportCount(id, n) {
   await db('tpl_meta', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { key: `export:${id}`, value: { count: n, at: new Date().toISOString() } } });
+}
+async function resumeCount(uid) {
+  const rows = await db('resumes', { query: { select: 'id', owner: `eq.${uid}`, archived: 'eq.false' } });
+  return (rows || []).length;
+}
+/* 新建/复制简历前的受限档份数上限；返回 true 表示已拦截并发送响应 */
+async function guardResumeLimit(user, res) {
+  if (isLimited(user)) {
+    const n = await resumeCount(user.id);
+    if (n >= FREE_RESUME_LIMIT) { send(res, 402, { error: `免费档最多保存 ${FREE_RESUME_LIMIT} 份简历，填写邀请码解锁不限份数`, needRegister: true, plan: 'guest', resumeLimit: FREE_RESUME_LIMIT }); return true; }
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------------ 工具 */
@@ -379,6 +392,7 @@ async function ownResume(req, user, id) {
 
 async function apiResumes(req, res, body, user) {
   if (!user) return send(res, 401, { error: '请先登录' });
+  if (await guardResumeLimit(user, res)) return;
   const name = String(body.name || '未命名简历').slice(0, 60);
   const created = await db('resumes', {
     method: 'POST',
@@ -439,6 +453,10 @@ async function apiBatch(req, res, body, user) {
     return send(res, 200, { ok: true, done: done.length, skipped, op });
   }
   if (op === 'duplicate') {
+    if (isLimited(user)) {
+      const n = await resumeCount(user.id);
+      if (n + mine.length > FREE_RESUME_LIMIT) return send(res, 402, { error: `免费档最多保存 ${FREE_RESUME_LIMIT} 份简历，填写邀请码解锁不限份数`, needRegister: true, plan: 'guest', resumeLimit: FREE_RESUME_LIMIT });
+    }
     for (const r of mine) {
       await db('resumes', {
         method: 'POST',
@@ -544,6 +562,7 @@ async function apiDuplicate(req, res, user, id) {
   if (!user) return send(res, 401, { error: '请先登录' });
   const r = await ownResume(req, user, id);
   if (!r) return send(res, 404, { error: '简历不存在或无权限' });
+  if (await guardResumeLimit(user, res)) return;
   const out = await db('resumes', {
     method: 'POST',
     prefer: 'return=representation',
