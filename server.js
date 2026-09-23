@@ -26,12 +26,19 @@ const SESSION_DAYS = 30;
 const MAX_BODY = 10 * 1024 * 1024;
 
 /* ------------------------------------------------------------------ 数据访问 */
+/* DB_MODE: 空=Supabase(PostgREST /rest/v1)；'cloudbase'=腾讯云 CloudBase PostgreSQL 的 HTTP API(/v1/rdb/rest)。
+   两者都是 PostgREST 语义（select=/eq./in.()/order/Prefer 等一致），仅 URL 前缀与密钥不同。 */
+const DB_MODE = (process.env.DB_MODE || '').trim().toLowerCase();
+const PG_BASE = (process.env.PG_API_BASE || '').replace(/\/+$/, '');
+const PG_KEY = (process.env.PG_API_KEY || '').trim();
 async function db(path, { method = 'GET', query = {}, body, prefer } = {}) {
-  const url = new URL(`${SB}/rest/v1/${path}`);
+  const cb = DB_MODE === 'cloudbase';
+  const url = new URL(cb ? `${PG_BASE}/v1/rdb/rest/${path}` : `${SB}/rest/v1/${path}`);
   for (const [k, v] of Object.entries(query)) {
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
   }
-  const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, Accept: 'application/json' };
+  const authKey = cb ? PG_KEY : KEY;
+  const headers = { apikey: authKey, Authorization: `Bearer ${authKey}`, Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (prefer) headers['Prefer'] = prefer;
   const res = await fetch(url, {
