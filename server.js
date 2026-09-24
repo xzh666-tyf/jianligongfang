@@ -974,6 +974,16 @@ async function handleApi(req, res, url, user) {
  * 计数变成“每实例”，属可接受的弱化。 */
 export async function handleRequest(req, res) {
   const url = new URL(req.url, 'http://x');
+  /* ② 自愈补发 cookie：老会话只有 Authorization: Bearer、浏览器里还没有 rw_sess cookie 时，
+     借这次已认证的请求把 cookie 下发出去。否则前端清掉 localStorage 副本后，
+     用户下次刷新就既无本地 token 也无 cookie —— 会被当成游客（线上实测踩过这个坑）。 */
+  const authHdr = String(req.headers.authorization || '');
+  if (authHdr.startsWith('Bearer ') && !cookieToken(req)) {
+    const bearer = authHdr.slice(7).trim();
+    if (bearer.length >= 20) {
+      try { res.setHeader('Set-Cookie', authCookie(req, bearer)); } catch (e) { /* 响应已发出则跳过 */ }
+    }
+  }
   try {
     if (url.pathname.startsWith('/api/')) {
       const user = await currentUser(req);

@@ -2244,8 +2244,11 @@ async function boot() {
       }
       bs = await API.call('/api/bootstrap');
     } else if (localStorage.getItem(LS_TOKEN) && bs.me && bs.me.role !== 'guest') {
-      /* 老版本把注册账号 token 存进了 localStorage；cookie 已能独立认证，清掉这份持久副本（游客不动，避免身份不连续） */
-      localStorage.removeItem(LS_TOKEN);
+      /* 分两拍清历史 token，避免"两头都没凭证"的窗口：
+         第一拍只打标记（这次请求带的是 Bearer，服务端会顺手把 HttpOnly cookie 下发下来）；
+         第二拍确认 cookie 已经种上，才删掉 localStorage 里的持久副本 */
+      if (localStorage.getItem('rw.cookieIssued')) localStorage.removeItem(LS_TOKEN);
+      else localStorage.setItem('rw.cookieIssued', '1');
     }
     const full = await API.call('/api/templates');
     state.me = bs.me || null;
