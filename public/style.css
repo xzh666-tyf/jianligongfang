@@ -435,6 +435,60 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .page.st-terminal .track i { background: var(--accent); }
 .page.st-terminal .photo { border-color: #21262d; }
 
+/* ============ 创意骨架批次（2026-09 新增）：seal / vrail / card / bignum / rail / hairline ============ */
+/* 朱砂印章：姓名后一枚印章色块，章节用【】，整体中式克制 */
+.page.st-seal .head .nm { letter-spacing: 6px; font-weight: 800; }
+.page.st-seal .head .nm::after { content: ''; display: inline-block; width: .52em; height: .52em; margin-left: .32em; background: var(--accent); border-radius: 2px; box-shadow: 0 0 0 2px var(--paperbg, #fff) inset; }
+.page.st-seal .sec { border-top: 1px solid color-mix(in srgb, var(--accent) 26%, var(--paperbg, #fff)); padding-top: 7px; }
+.page.st-seal .secu, .page.st-seal .secbar { border-bottom: none; background: none; }
+.page.st-seal .secu::before { content: '【'; color: var(--accent); }
+.page.st-seal .secu::after { content: '】'; color: var(--accent); }
+.page.st-seal .ul li::marker { color: var(--accent); }
+
+/* 竖排导轨：章节名竖排在左侧，正文拿到完整宽度 */
+.page.st-vrail { padding-left: 26mm; }
+.page.st-vrail .sec { position: relative; }
+.page.st-vrail .secu, .page.st-vrail .secbar, .page.st-vrail .secp, .page.st-vrail .secnum, .page.st-vrail .secc, .page.st-vrail .secicon {
+  position: absolute; left: -22mm; top: 0; width: 18mm; border: none; background: none; padding: 0; margin: 0;
+  writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 3px;
+  font-size: calc(10pt * var(--sf)); color: var(--sec, var(--accent)); font-weight: 700; text-align: left; }
+.page.st-vrail .sec::after { content: ''; position: absolute; left: -8mm; top: 4px; bottom: 2px; width: 1px; background: color-mix(in srgb, var(--accent) 22%, var(--paperbg, #fff)); }
+
+/* 软卡片：每节一张圆角卡片，扫读分区最清楚 */
+.page.st-card { background: color-mix(in srgb, var(--accent) 4%, var(--paperbg, #fff)); }
+.page.st-card .sec { background: var(--paperbg, #fff); border-radius: 10px; padding: 9px 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(30,40,60,.07); border-left: 3px solid var(--accent); }
+.page.st-card .secu, .page.st-card .secbar { border: none; background: none; padding: 0 0 2px; margin: 0 0 4px; font-size: calc(10.5pt * var(--sf)); letter-spacing: 1px; }
+.page.st-card .rule { display: none; }
+
+/* 空心编号：描边大数字做索引，编辑设计感（序号来自 .sec 的 data-n） */
+.page.st-bignum .sec { position: relative; padding-left: 15mm; margin-bottom: 11px; }
+.page.st-bignum .secu, .page.st-bignum .secbar, .page.st-bignum .secp, .page.st-bignum .secnum, .page.st-bignum .secc, .page.st-bignum .secicon {
+  position: static; border: none; background: none; padding: 0; margin: 0 0 4px; font-size: calc(11pt * var(--sf)); letter-spacing: 1px; }
+.page.st-bignum .sec::before { content: attr(data-n); position: absolute; left: 0; top: -3px; font-size: calc(26pt * var(--sf)); font-weight: 800; line-height: 1; color: transparent; -webkit-text-stroke: 1.2px color-mix(in srgb, var(--accent) 55%, var(--paperbg, #fff)); }
+
+/* 色带时间轴：左侧渐变轨道 + 章节节点，纵向动线明确（章节名保持可见） */
+.page.st-rail { padding-left: 22mm; }
+.page.st-rail::before { content: ''; position: absolute; left: 15mm; top: 30mm; bottom: 14mm; width: 2px; background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 18%, var(--paperbg, #fff))); }
+.page.st-rail .sec { position: relative; margin-bottom: 11px; }
+.page.st-rail .secu, .page.st-rail .secbar, .page.st-rail .secp, .page.st-rail .secnum {
+  position: relative; border: none; background: none; padding: 0 0 0 6mm; margin: 0 0 5px;
+  font-size: calc(10.5pt * var(--sf)); letter-spacing: 1px; }
+.page.st-rail .secu::before, .page.st-rail .secbar::before, .page.st-rail .secp::before, .page.st-rail .secnum::before {
+  content: ''; position: absolute; left: -7.5mm; top: 2px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--paperbg, #fff); }
+.page.st-rail .head .nm { letter-spacing: 3px; }
+
+/* 极简双线：姓名夹在两条线之间，章节小字距 + 短下划杠 */
+.page.st-hairline { padding: 16mm; }
+.page.st-hairline .head { border-top: 2.5px solid var(--accent); border-bottom: 1px solid var(--accent); padding: 9px 0; }
+.page.st-hairline .head .nm { letter-spacing: 10px; font-size: calc(17pt * var(--sf)); font-weight: 600; }
+.page.st-hairline .secu, .page.st-hairline .secbar { border: none; background: none; letter-spacing: 4px; font-size: calc(9pt * var(--sf)); padding: 0; margin: 0 0 5px; }
+.page.st-hairline .secu::after { content: ''; display: block; width: 22px; height: 2px; background: var(--accent); margin-top: 3px; }
+.page.st-hairline .rule { display: none; }
+@media print {
+  .page.st-vrail, .page.st-rail, .page.st-bignum, .page.st-card, .page.st-hairline, .page.st-seal { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
 /* ===== 功能：投递漏斗看板 ===== */
 .funnel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
 .fn-h { font-weight: 700; font-size: 13.5px; margin-bottom: 10px; color: var(--ink); }

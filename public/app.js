@@ -57,6 +57,13 @@ const STYLES = [
   { id: 'donut', name: '数据环视', layout: 'default', head: 'bar', font: 'sans', dens: 1, lh: 1.55, accent: '#4a3f8f' },
   { id: 'voyage', name: '航线差旅', layout: 'default', head: 'bar', font: 'sans', dens: 1, lh: 1.58, accent: '#117a65' },
   { id: 'terminal', name: '极客终端', layout: 'default', head: 'plain', font: 'mono', dens: 1, lh: 1.6, accent: '#39d353', dark: true },
+  /* 创意骨架批次（2026-09 新增，渲染靠 .st-<id> 的 CSS；空心编号用 .sec 的 data-n） */
+  { id: 'seal', name: '朱砂印章', layout: 'default', head: 'underline', font: 'serif', dens: 1, lh: 1.6, accent: '#a63a2b', titleStyle: 'underline', nameStyle: 'serif' },
+  { id: 'vrail', name: '竖排导轨', layout: 'default', head: 'underline', font: 'sans', dens: 1, lh: 1.55, accent: '#1f6f8f', titleStyle: 'underline' },
+  { id: 'card', name: '软卡片', layout: 'default', head: 'bar', font: 'sans', dens: 1, lh: 1.55, accent: '#2f5c8f', titleStyle: 'bar' },
+  { id: 'bignum', name: '空心编号', layout: 'default', head: 'numbered', font: 'sans', dens: 1, lh: 1.55, accent: '#4a3f8f', titleStyle: 'numbered' },
+  { id: 'rail', name: '色带时间轴', layout: 'default', head: 'underline', font: 'sans', dens: 1, lh: 1.55, accent: '#117a65', titleStyle: 'underline' },
+  { id: 'hairline', name: '极简双线', layout: 'default', head: 'plain', font: 'sans', dens: 1.05, lh: 1.65, accent: '#1c1c1e', titleStyle: 'plain', nameStyle: 'big' },
 ];
 const styleOf = (id) => STYLES.find((s) => s.id === id) || STYLES[0];
 const styleTheme = (s) => ({
@@ -137,6 +144,13 @@ const RESUME_THEMES = [
   { id: 'nw-terracotta', name: '陶土色块', g: '商务', base: 'classic', accent: '#b5651d', companyColor: '#8a4416', titleStyle: 'leftblock', nameStyle: 'boxed' },
   { id: 'nw-serifbig', name: '衬线大字', g: '编辑设计', base: 'classic', accent: '#1c1c1e', font: 'serif', nameStyle: 'serif', titleStyle: 'centerline' },
   { id: 'nw-sidebar-in', name: '靛蓝内 sidebar', g: '侧栏', base: 'sidebar', accent: '#3b4a6b', skillLevel: 'text' },
+  /* —— 创意骨架批次（2026-09）：每个只留一份，配色在主题卡上直接调，不再靠"同版式换色"凑数 —— */
+  { id: 'cr-seal', name: '朱砂印章', g: '创意', base: 'seal', accent: '#a63a2b' },
+  { id: 'cr-vrail', name: '竖排导轨', g: '创意', base: 'vrail', accent: '#1f6f8f' },
+  { id: 'cr-card', name: '软卡片', g: '创意', base: 'card', accent: '#2f5c8f' },
+  { id: 'cr-bignum', name: '空心编号', g: '创意', base: 'bignum', accent: '#4a3f8f' },
+  { id: 'cr-rail', name: '色带时间轴', g: '创意', base: 'rail', accent: '#117a65' },
+  { id: 'cr-hairline', name: '极简双线', g: '创意', base: 'hairline', accent: '#1c1c1e' },
 ];
 const THEME_GROUPS = ['全部', ...Array.from(new Set(RESUME_THEMES.map((t) => t.g)))];
 function themeObj(t) {
@@ -759,7 +773,7 @@ function pageHTML(r, forPrint) {
     else if (ts === 'numbered') h = `<div class="secnum"><i>${String(secNo).padStart(2, '0')}</i>${lb}</div>`;
     else if (ts === 'centerline') h = `<div class="secc"><span>${lb}</span></div>`;
     else h = `<div class="secu">${lb}</div>`;
-    return `<div class="sec">${h}${body}</div>`;
+    return `<div class="sec" data-n="${String(secNo).padStart(2, '0')}">${h}${body}</div>`;
   };
   const exp = (o) => `<div class="exphead"><b>${esc(o.company || o.name || '')}</b>${has(o.role) ? `<span class="role">${esc(o.role)}</span>` : ''}<span class="tm">${[o.start, o.end].filter(Boolean).join(' – ')}</span></div>`;
 
