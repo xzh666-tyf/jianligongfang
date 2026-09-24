@@ -31,7 +31,7 @@ const MAX_BODY = 10 * 1024 * 1024;
 const DB_MODE = (process.env.DB_MODE || '').trim().toLowerCase();
 const PG_BASE = (process.env.PG_API_BASE || '').replace(/\/+$/, '');
 const PG_KEY = (process.env.PG_API_KEY || '').trim();
-async function db(path, { method = 'GET', query = {}, body, prefer } = {}) {
+async function db(path, { method = 'GET', query = {}, body, prefer, wantCount = false } = {}) {
   const cb = DB_MODE === 'cloudbase';
   const url = new URL(cb ? `${PG_BASE}/v1/rdb/rest/${path}` : `${SB}/rest/v1/${path}`);
   for (const [k, v] of Object.entries(query)) {
@@ -41,6 +41,7 @@ async function db(path, { method = 'GET', query = {}, body, prefer } = {}) {
   const headers = { apikey: authKey, Authorization: `Bearer ${authKey}`, Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (prefer) headers['Prefer'] = prefer;
+  if (wantCount) headers.Range = '0-0'; /* 只取 1 行，总数从响应头 content-range 读 */
   const res = await fetch(url, {
     method,
     headers,
@@ -51,6 +52,17 @@ async function db(path, { method = 'GET', query = {}, body, prefer } = {}) {
     const err = new Error(`db ${res.status} ${method} ${path}: ${txt.slice(0, 400)}`);
     err.status = 502;
     throw err;
+  }
+  if (wantCount) {
+    const cr = res.headers.get('content-range') || '';
+    const total = Number(cr.split('/')[1]);
+    if (!Number.isFinite(total)) {
+      /* 明确报错而不是静默返回 0：便于立刻看出网关不支持 Range 计数 */
+      const err = new Error(`count ${path}: 网关未返回可用的 content-range（收到 "${cr}"）`);
+      err.status = 502;
+      throw err;
+    }
+    return total;
   }
   return txt ? JSON.parse(txt) : null;
 }
@@ -791,7 +803,7 @@ async function apiAiRun(req, res, body) {
 }
 
 /* ------------------------------------------------------------- 站长后台 */
-const ADMIN = makeAdmin({ db, hashPassword, send, templatesCacheBreak, SB, KEY });
+const ADMIN = makeAdmin({ db, hashPassword, send, templatesCacheBreak });
 
 /* ------------------------------------------------------------------ 路由 */
 async function handleApi(req, res, url, user) {

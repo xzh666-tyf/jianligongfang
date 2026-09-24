@@ -30,7 +30,20 @@ let SLUGS = [];
 async function overview() {
   const d = await api('stats');
   $('#statCards').innerHTML = Object.entries(d.stats).map(([k, v]) =>
-    `<div class="stat"><b>${v}</b><span>${LABELS[k] || k}</span></div>`).join('');
+    `<div class="stat"><b>${v == null ? '—' : v}</b><span>${LABELS[k] || k}</span></div>`).join('');
+  /* 单项计数失败不再拖垮整页：卡片显示 —，并把服务端回传的原因单独列出来便于排障 */
+  const old = document.getElementById('statErr');
+  if (old) old.remove();
+  const errs = Object.entries(d.countErrors || {});
+  if (errs.length) {
+    const box = document.createElement('div');
+    box.className = 'box';
+    box.id = 'statErr';
+    box.innerHTML = `<h3>部分计数未取到</h3><p class="hint" style="margin-top:0">`
+      + `这几项网关没有返回计数，页面其余功能不受影响：`
+      + errs.map(([k, m]) => `<br>· ${LABELS[k] || k}：${esc(m)}`).join('') + `</p>`;
+    $('#statCards').insertAdjacentElement('afterend', box);
+  }
   $('#recent').innerHTML = d.recent.length
     ? `<table class="tr"><tr><th>用户名</th><th>角色</th><th>注册时间</th></tr>${d.recent.map((u) =>
       `<tr><td>${esc(u.username)}</td><td>${u.role === 'admin' ? '<span class="pill g">站长</span>' : '<span class="pill">普通</span>'}</td><td>${esc((u.created_at || '').slice(0, 16).replace('T', ' '))}</td></tr>`).join('')}</table>`
