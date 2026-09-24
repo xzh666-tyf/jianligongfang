@@ -258,12 +258,19 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .sth .tb { position: absolute; inset: 0; transform: scale(.42); transform-origin: top left; width: 240%; height: 240%; }
 .stn { font-size: 11.5px; color: var(--ink2); font-weight: 550; }
 .stcard.on .stn { color: var(--navy); font-weight: 650; }
-.thgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 6px; }
+.thgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 8px; margin-bottom: 6px; }
 .thcard { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 6px 6px 5px; text-align: left; transition: .2s var(--ease); }
 .thcard:hover { border-color: var(--navy); transform: translateY(-1px); }
 .thcard.on { border-color: var(--navy); box-shadow: 0 0 0 2.5px rgba(10, 132, 255, .2); }
 .thcard .sth .tb { transform: scale(.42); transform-origin: top left; width: 240%; height: 240%; }
 .thcard.locked { opacity: .62; }
+/* ④c 一张卡 = 一个版式；卡片下方的色点是同版式的备用色，点它即"选版式 + 换色"一步到位 */
+.thcell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.thcell .thcard { width: 100%; }
+.swrow { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.sw { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line); padding: 0; cursor: pointer; transition: .15s var(--ease); }
+.sw:hover { transform: scale(1.2); }
+.sw.on { border-color: var(--navy); box-shadow: 0 0 0 2px rgba(10, 132, 255, .22); }
 .thcard.locked .sth::after { content: "🔒"; position: absolute; right: 5px; top: 4px; font-size: 12px; filter: grayscale(.2); }
 .thcard.locked:hover { border-color: var(--amber); transform: none; }
 .guestbar button { flex: 0 0 auto; }

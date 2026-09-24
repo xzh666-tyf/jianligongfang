@@ -153,6 +153,37 @@ const RESUME_THEMES = [
   { id: 'cr-hairline', name: '极简双线', g: '创意', base: 'hairline', accent: '#1c1c1e' },
 ];
 const THEME_GROUPS = ['全部', ...Array.from(new Set(RESUME_THEMES.map((t) => t.g)))];
+
+/* ④c 主题卡合并：把"同版式、只是换颜色"的变体折成一张卡，卡下挂色点。
+   关键取舍：RESUME_THEMES 一条都不删——老简历存的 themeId 仍能原样解析，零迁移零风险；
+   合并只发生在渲染层。判定"同一式"用口径 A：base/layout/titleStyle/nameStyle/head，
+   字体/暗色/纹理/信息列数这些算可调旋钮，不算不同版式。 */
+const THEME_SIG_KEYS = ['base', 'layout', 'titleStyle', 'nameStyle', 'head'];
+const themeSig = (t) => THEME_SIG_KEYS.map((k) => k + '=' + (t[k] || '')).join('|');
+const THEME_CARD_OF = new Map();   /* themeId → 所属卡片（含被折叠的换色变体） */
+const THEME_CARDS = (() => {
+  const out = [];
+  const bySig = new Map();
+  for (const t of RESUME_THEMES) {
+    const s = themeSig(t);
+    let c = bySig.get(s);
+    if (!c) { c = { id: t.id, name: t.name, g: t.g, rep: t, variants: [] }; bySig.set(s, c); out.push(c); }
+    c.variants.push(t);
+  }
+  for (const c of out) {
+    const seen = new Set();
+    c.swatches = c.variants.filter((t) => {
+      const a = String(t.accent || '').toLowerCase();
+      if (!a || seen.has(a)) return false;
+      seen.add(a); return true;
+    }).slice(0, 8);
+    for (const t of c.variants) THEME_CARD_OF.set(t.id, c);
+  }
+  return out;
+})();
+const cardOfTheme = (id) => THEME_CARD_OF.get(id) || null;
+/* 当前简历命中的卡片：只要 themeId 属于这张卡的任一变体，就算选中 */
+const cardIsOn = (c, themeId) => c.variants.some((t) => t.id === themeId);
 function themeObj(t) {
   const o = styleTheme(styleOf(t.base));
   o.accent = t.accent;
@@ -668,12 +699,18 @@ function renderEditor() {
   out.push(`<fieldset><legend>版式与主题</legend>
     <div class="famlabel">简历主题</div>
     <div class="chips thgrp">${THEME_GROUPS.map((g) => `<button data-act="thgrp" data-g="${g}" class="${state.thGroup === g ? 'on' : ''}">${g}</button>`).join('')}</div>
-    <div class="thgrid">${RESUME_THEMES.filter((t) => state.thGroup === '全部' || t.g === state.thGroup).map((t) => {
-      const th = themeObj(t);
-      const locked = isLimited() && !themeFree(t.id);
-      return `<button class="thcard ${r.theme.themeId === t.id ? 'on' : ''} ${locked ? 'locked' : ''}" data-act="theme" data-t="${t.id}" title="${t.name}${locked ? ' · 邀请码解锁' : ''}">
-        <span class="sth">${mockThumb(th, th.layout)}</span><span class="stn">${t.name}${locked ? ' 🔒' : ''}</span></button>`;
+    <div class="thgrid">${THEME_CARDS.filter((c) => state.thGroup === '全部' || c.g === state.thGroup).map((c) => {
+      const th = themeObj(c.rep);
+      const locked = isLimited() && !themeFree(c.id);
+      const on = cardIsOn(c, r.theme.themeId);
+      /* 色点行：同版式的换色变体收在这，点色点＝选版式并直接换色（不再需要翻好几张几乎一样的卡） */
+      const dots = c.swatches.length > 1
+        ? `<span class="swrow">${c.swatches.map((v) => `<button class="sw ${String(r.theme.accent).toLowerCase() === String(v.accent).toLowerCase() ? 'on' : ''}" style="background:${v.accent}" data-act="themeswatch" data-t="${v.id}" title="${v.name} · ${v.accent}"></button>`).join('')}</span>`
+        : '';
+      return `<div class="thcell"><button class="thcard ${on ? 'on' : ''} ${locked ? 'locked' : ''}" data-act="theme" data-t="${c.id}" title="${c.name}${locked ? ' · 邀请码解锁' : ''}">
+        <span class="sth">${mockThumb(th, th.layout)}</span><span class="stn">${c.name}${locked ? ' 🔒' : ''}</span></button>${dots}</div>`;
     }).join('')}</div>
+    <p class="hint" style="margin:6px 0 0">${RESUME_THEMES.length} 套主题已按版式归并为 ${THEME_CARDS.length} 张卡；卡片下方的色点是同版式的备用色，主色还可在下面「配色」里任意调</p>
     <div class="famlabel">配色预设</div>
     <div class="chips palrow">${THEME_PRESETS.map((p, pi) => `<button data-act="preset" data-pi="${pi}"><i style="background:${p.accent}"></i>${p.name}${p.dark ? ' 🌙' : ''}</button>`).join('')}</div>
     <div class="famlabel">配色</div>
@@ -1181,9 +1218,10 @@ async function batchOp(op, extra) {
 
 function pickThemeThen(cb) {
   $('#verMask').classList.add('on');
-  $('#verList').innerHTML = '<p class="hint">选一套主题，应用到勾选的简历</p><div class="thgrid">' + RESUME_THEMES.map((t) => {
-    const th = themeObj(t);
-    return '<button class="thcard" data-pt="' + t.id + '"><span class="sth">' + mockThumb(th, th.layout) + '</span><span class="stn">' + t.name + '</span></button>';
+  $('#verList').innerHTML = '<p class="hint">选一套主题，应用到勾选的简历（' + THEME_CARDS.length + ' 张卡；点卡片下方的色点＝同版式换色）</p><div class="thgrid">' + THEME_CARDS.map((c) => {
+    const th = themeObj(c.rep);
+    const dots = c.swatches.length > 1 ? '<span class="swrow">' + c.swatches.map((v) => '<button class="sw" style="background:' + v.accent + '" data-pt="' + v.id + '" title="' + v.name + ' · ' + v.accent + '"></button>').join('') + '</span>' : '';
+    return '<div class="thcell"><button class="thcard" data-pt="' + c.id + '"><span class="sth">' + mockThumb(th, th.layout) + '</span><span class="stn">' + c.name + '</span></button>' + dots + '</div>';
   }).join('') + '</div>';
   $('#verList').onclick = (e) => {
     const b = e.target.closest('[data-pt]');
@@ -1665,7 +1703,7 @@ function bind() {
     const act = b.dataset.act;
     const k = b.dataset.k;
     const i = Number(b.dataset.i);
-    if (['itemadd', 'itemdel', 'mvup', 'mvdn', 'btadd', 'btdel', 'skilladd', 'certadd', 'extraadd', 'photodel', 'theme', 'preset', 'palette'].includes(act)) pushHistory();
+    if (['itemadd', 'itemdel', 'mvup', 'mvdn', 'btadd', 'btdel', 'skilladd', 'certadd', 'extraadd', 'photodel', 'theme', 'themeswatch', 'preset', 'palette'].includes(act)) pushHistory();
     if (act === 'itemadd') {
       d[k] = d[k] || [];
       d[k].push(k === 'work' ? { company: '', role: '', start: '', end: '', bullets: [''] }
@@ -1681,6 +1719,8 @@ function bind() {
     else if (act === 'certadd') { d.certs.push({ name: '', date: '', org: '' }); }
     else if (act === 'extraadd') { d.extra.push({ k: '', v: '' }); }
     else if (act === 'theme') { const th = RESUME_THEMES.find((x) => x.id === b.dataset.t); if (!th) { /* noop */ } else if (isLimited() && !themeFree(th.id)) upgradeNudge('该主题需填写邀请码解锁'); else applyTheme(r, th); }
+    /* 色点：套用该变体（版式同代表项，颜色与分部位配色随变体走）；门控按所属卡片判定 */
+    else if (act === 'themeswatch') { const th = RESUME_THEMES.find((x) => x.id === b.dataset.t); const c = th && cardOfTheme(th.id); if (!th) { /* noop */ } else if (isLimited() && c && !themeFree(c.id)) upgradeNudge('该主题需填写邀请码解锁'); else applyTheme(r, th); }
     else if (act === 'thgrp') { state.thGroup = b.dataset.g; renderEditor(); return; }
     else if (act === 'palette') { if (isLimited()) { upgradeNudge('自定义配色需填写邀请码解锁'); } else r.theme.accent = b.dataset.c; }
     else if (act === 'preset') { if (isLimited()) { upgradeNudge('配色预设需填写邀请码解锁'); } else { const pr = THEME_PRESETS[Number(b.dataset.pi)] || {}; r.theme.accent = pr.accent; r.theme.secondary = pr.secondary; r.theme.secColor = pr.secColor; r.theme.tmColor = pr.tmColor; r.theme.paperBg = pr.paperBg; r.theme.dark = pr.dark; r.theme.themeId = ''; } }
