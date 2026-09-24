@@ -29,6 +29,7 @@ const DEFAULT_THEME = {
   ls: 0,
   dens: 1,
   font: 'sans',
+  titleFont: '',   /* 空 = 标题字体跟随主题原设计（如工程蓝图仍用等宽）；选了就用用户指定的 */
   photo: 'rounded',
   head: 'bar',
   titleStyle: 'bar',
@@ -691,8 +692,9 @@ function renderEditor() {
     <div class="row"><label>行距</label><input type="range" min="1.3" max="1.9" step="0.05" data-p="#theme.lh" value="${r.theme.lh}" /><span style="width:38px;font-size:12px">${r.theme.lh}</span></div>
     <div class="row"><label>字间距</label><input type="range" min="0" max="1.2" step="0.1" data-p="#theme.ls" value="${r.theme.ls}" /><span style="width:38px;font-size:12px">${r.theme.ls}px</span></div>
     <div class="row"><label>紧凑度</label><input type="range" min="0.7" max="1.3" step="0.05" data-p="#theme.dens" value="${r.theme.dens}" /></div>
-    <div class="row"><label>字体</label><select class="t" data-p="#theme.font">${FONTS.map(([k, t]) => `<option value="${k}" ${r.theme.font === k ? 'selected' : ''} ${isLimited() && !fontFree(k) ? 'disabled' : ''}>${t}${isLimited() && !fontFree(k) ? ' 🔒' : ''}</option>`).join('')}</select>
+    <div class="row"><label>正文字体</label><select class="t" data-p="#theme.font">${FONTS.map(([k, t]) => `<option value="${k}" ${r.theme.font === k ? 'selected' : ''} ${isLimited() && !fontFree(k) ? 'disabled' : ''}>${t}${isLimited() && !fontFree(k) ? ' 🔒' : ''}</option>`).join('')}</select>
       <label style="flex:0 0 60px">头像形状</label><select class="t" data-p="#theme.photo"><option value="rounded" ${r.theme.photo === 'rounded' ? 'selected' : ''}>圆角</option><option value="circle" ${r.theme.photo === 'circle' ? 'selected' : ''}>圆形</option><option value="square" ${r.theme.photo === 'square' ? 'selected' : ''}>直角</option></select></div>
+    <div class="row"><label>标题字体</label><select class="t" data-p="#theme.titleFont"><option value="" ${r.theme.titleFont ? '' : 'selected'}>跟随主题</option>${FONTS.map(([k, t]) => `<option value="${k}" ${r.theme.titleFont === k ? 'selected' : ''} ${isLimited() && !fontFree(k) ? 'disabled' : ''}>${t}${isLimited() && !fontFree(k) ? ' 🔒' : ''}</option>`).join('')}</select><span style="font-size:12px;color:#8d97a3">标题＝姓名 + 板块标题</span></div>
     <div class="famlabel">显示哪些板块</div>
     <div class="grid2">${Object.keys(SECTION_TITLES).filter((k) => k !== 'base').map((k) =>
       `<label class="toggle"><input type="checkbox" data-p="#theme.hidden" value="${k}" ${(r.theme.hidden || []).includes(k) ? '' : 'checked'} /> ${SECTION_TITLES[k]}</label>`).join('')}</div>
@@ -737,7 +739,8 @@ function pageHTML(r, forPrint) {
     ? info.filter(([k]) => !dropKeys.includes(k)).map(([k, v]) => [k, k === '电话' ? maskPhone(v) : k === '邮箱' ? maskMail(v) : v])
     : info;
   const photo = (b.photo && !t.ats) ? `<img class="photo ${t.photo}" src="${b.photo}" />` : '';
-  const head = `<div class="head nm-${t.nameStyle || 'default'}">${photo ? '' : ''}<div><div class="nm">${esc(b.name || '姓名')}</div>
+  /* ht = 文本块（可收缩），hp = 有头像（侧栏版式据此改为上下堆叠，避免 46mm 窄栏里互挤） */
+  const head = `<div class="head nm-${t.nameStyle || 'default'}${photo ? ' hp' : ''}"><div class="ht"><div class="nm">${esc(b.name || '姓名')}</div>
       ${has(b.intent) ? `<div class="it">${esc(b.intent)}</div>` : ''}</div><div class="sp"></div>${photo}</div>
       ${shownInfo.length ? `<div class="info info-${t.infoCols || 3}">${shownInfo.map((x) => `<div><span class="k">${x[0]}：</span>${esc(x[1])}</div>`).join('')}</div>` : ''}`;
 
@@ -820,29 +823,33 @@ function pageHTML(r, forPrint) {
 
   const cslot = (t.nameColor ? `--namec:${t.nameColor};` : '') + (t.intentColor ? `--intentc:${t.intentColor};` : '')
     + (t.companyColor ? `--companyc:${t.companyColor};` : '') + (t.roleColor ? `--rolec:${t.roleColor};` : '') + (t.bodyColor ? `--bodyc:${t.bodyColor};` : '');
+  /* 字体栈里含双引号，直接拼进 style="..." 会被 HTML 解析器在第一个引号处截断
+     （实测 7 种字体全部失效：正文从未按所选字体渲染，只有走样式表的标题规则生效，
+     所以现象是"改字体没反应 / 只有标题变了"）→ 输出前统一把双引号换成单引号 */
+  const fam = (k) => String(FONT_MAP[k] || FONT_MAP.sans).replace(/"/g, "'");
   const vars = `--accent:${t.accent};--secondary:${t.secondary};--tagbg:${mix(t.accent, '#ffffff', 0.88)};--sf:${t.sf};--lh:${t.lh};--ls:${t.ls}px;--dens:${t.dens};`
-    + `--sec:${t.secColor || t.accent};--tm:${t.tmColor || '#8d97a3'};--paperbg:${t.dark ? '#1b1d22' : (t.paperBg || '#fff')};--inkp:${t.dark ? '#e6edf3' : '#242b33'};` + cslot;
-  const family = FONT_MAP[t.font] || FONT_MAP.sans;
+    + `--sec:${t.secColor || t.accent};--tm:${t.tmColor || '#8d97a3'};--paperbg:${t.dark ? '#1b1d22' : (t.paperBg || '#fff')};--inkp:${t.dark ? '#e6edf3' : '#242b33'};`
+    + cslot + (t.titleFont ? `--titlefont:${fam(t.titleFont)};` : '') + `font-family:${fam(t.font)};`;
   const cls = `page layout-${t.layout} font-${t.font} st-${t.style || 'classic'}${t.timeline ? ' has-tl' : ''}${t.ats ? ' is-ats' : ''}${t.dark ? ' is-dark' : ''}${t.tex && t.tex !== 'none' ? ' tex-' + t.tex : ''}`;
   const route = `<div class="route"><span class="nd"></span><span class="ln"></span><span class="nd"></span><span class="ln"></span><span class="nd"></span><span class="pl">✈</span></div>`;
 
   if (t.layout === 'banner') {
-    return `<div class="${cls}" style="${vars};font-family:${family}">
+    return `<div class="${cls}" style="${vars}">
       <div class="band" style="background:${t.accent}">${head}</div><div class="wrap">${main}</div></div>`;
   }
   if (t.layout === 'sidebar') {
     const side = `${head}<div class="secu">专业技能</div>${skl() || '<div class="sb">—</div>'}
       <div class="secu">证书与荣誉</div><div class="sb">${(d.certs || []).filter((c) => has(c.name)).map((c) => esc(c.name)).join('、') || '—'}</div>
       <div class="secu">联系方式</div><div class="sb sb-contact">${shownInfo.map((x) => `<span class="ck">${esc(x[0])}</span><span class="cv">${esc(x[1])}</span>`).join('') || '—'}</div>`;
-    return `<div class="${cls}" style="${vars};font-family:${family}">
+    return `<div class="${cls}" style="${vars}">
       <div class="side" style="background:${t.accent}">${side}</div>
       <div class="main">${[sec('education', '教育经历', edu), sec('work', '工作经历', work), sec('campus', '校园经历', cam), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum), sec('hobbies', '兴趣爱好', hob)].join('')}</div></div>`;
   }
   if (t.layout === 'magazine') {
-    return `<div class="${cls}" style="${vars};font-family:${family}">${head}<div class="rule"></div><div class="body">${main}</div></div>`;
+    return `<div class="${cls}" style="${vars}">${head}<div class="rule"></div><div class="body">${main}</div></div>`;
   }
   const deco = t.style === 'voyage' ? route : '<div class="rule"></div>';
-  return `<div class="${cls}" style="${vars};font-family:${family}">${head}${deco}${main}</div>`;
+  return `<div class="${cls}" style="${vars}">${head}${deco}${main}</div>`;
 }
 
 function mix(hex, hex2, ratio) {

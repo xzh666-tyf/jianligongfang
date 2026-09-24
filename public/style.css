@@ -293,10 +293,13 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 }
 .page .ph { font-size: 12px; color: #a7b0bb; text-align: center; padding: 40px 0; }
 .head { display: flex; align-items: center; gap: 12px; }
+/* 文本块允许收缩到剩余空间（min-width:0 是关键，缺了它文本块会拒绝换行、反过来把头像挤扁）；
+   头像 flex:0 0 auto 固定不收缩，保证 4:5 比例不变形 */
+.head > .ht { flex: 1 1 auto; min-width: 0; }
 .head .nm { font-size: calc(20pt * var(--sf)); font-weight: 700; color: var(--accent); letter-spacing: 1px; }
 .head .it { font-size: calc(11pt * var(--sf)); color: var(--secondary); margin-top: 2px; }
 .head .sp { flex: 1; }
-.photo { width: 24mm; height: 30mm; object-fit: cover; border: 1px solid var(--tagbg); }
+.photo { width: 24mm; height: 30mm; object-fit: cover; border: 1px solid var(--tagbg); flex: 0 0 auto; }
 .photo.rounded { border-radius: 8px; }
 .photo.circle { border-radius: 50%; }
 .rule { height: 3px; background: var(--accent); margin: 9px 0 11px; }
@@ -351,6 +354,12 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .page.layout-sidebar .side .nm { color: #fff; font-size: calc(17pt * var(--sf)); }
 .page.layout-sidebar .side .it { color: rgba(255,255,255,.85); }
 .page.layout-sidebar .side .photo { border-color: rgba(255,255,255,.45); }
+/* 侧栏净宽只有 46mm，头像与姓名并排必然互挤（实测：求职意向断成 3 行、头像被压到 35px 宽且变形）
+   → 有头像时（app.js 会加 .hp 类）改为头像居中在上、姓名与求职意向在下 */
+.page.layout-sidebar .side .head.hp { flex-direction: column; align-items: center; text-align: center; gap: 9px; }
+.page.layout-sidebar .side .head.hp .sp { display: none; }
+.page.layout-sidebar .side .head.hp > .ht { flex: 0 0 auto; }
+.page.layout-sidebar .side .head.hp .photo { width: 26mm; height: 32mm; }
 .page.layout-sidebar .side .secu { color: #fff; border-color: rgba(255,255,255,.5); margin-top: 14px; }
 .page.layout-sidebar .side .sb, .page.layout-sidebar .side .tag { color: rgba(255,255,255,.92); font-size: calc(9.5pt * var(--sf)); }
 .page.layout-sidebar .side .tag { background: rgba(255,255,255,.16); }
@@ -375,12 +384,12 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
   background-size: 36px 36px, 36px 36px, 9px 9px, 9px 9px;
   border: 1.5px solid rgba(31,111,143,.45);
 }
-.page.st-blueprint .head .nm { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 3px; text-transform: uppercase; }
+.page.st-blueprint .head .nm { font-family: var(--titlefont, ui-monospace, Menlo, Consolas, monospace); letter-spacing: 3px; text-transform: uppercase; }
 .page.st-blueprint .rule { height: 0; background: none; border-top: 1.5px dashed var(--accent); }
 .page.st-blueprint .secu {
   border: none; display: inline-block; position: relative; background: #fff;
   border: 1.5px solid var(--accent); padding: 2px 9px; margin-bottom: 10px;
-  font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px;
+  font-family: var(--titlefont, ui-monospace, Menlo, Consolas, monospace); letter-spacing: 1px;
 }
 .page.st-blueprint .secu::after { content: ''; position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; border-right: 1.5px solid var(--accent); border-bottom: 1.5px solid var(--accent); }
 .page.st-blueprint::after {
@@ -407,7 +416,7 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .page.st-terminal { background: #0d1117; color: #c9d1d9; }
 .page.st-terminal .head .nm { color: var(--accent); }
 .page.st-terminal .head .nm::after { content: '▋'; margin-left: 4px; opacity: .7; }
-.page.st-terminal .secp { color: var(--accent); font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; }
+.page.st-terminal .secp { color: var(--accent); font-family: var(--titlefont, ui-monospace, Menlo, Consolas, monospace); font-weight: 700; }
 .page.st-terminal .secp::before { content: '## '; }
 .page.st-terminal .rule { background: #21262d; }
 .page.st-terminal .it, .page.st-terminal .infoline, .page.st-terminal .info, .page.st-terminal .exphead .role { color: #8b949e; }
@@ -433,7 +442,7 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 
 /* ===== 自定义字体/颜色扩展 ===== */
 /* 标题衬线 + 正文黑（mix 真正生效） */
-.page.font-mix .head .nm, .page.font-mix .secu, .page.font-mix .secbar, .page.font-mix .exphead b { font-family: Georgia, "Songti SC", "SimSun", serif; }
+.page.font-mix .head .nm, .page.font-mix .secu, .page.font-mix .secbar, .page.font-mix .exphead b { font-family: var(--titlefont, Georgia, "Songti SC", "SimSun", serif); }
 /* 纸张底纹 */
 .page.tex-grid { background-image: linear-gradient(rgba(120,130,140,.10) 1px, transparent 1px), linear-gradient(90deg, rgba(120,130,140,.10) 1px, transparent 1px); background-size: 22px 22px; }
 .page.tex-dots { background-image: radial-gradient(rgba(120,130,140,.16) 1px, transparent 1.4px); background-size: 16px 16px; }
@@ -473,7 +482,15 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .head.nm-big .nm { font-size: calc(30pt * var(--sf)); letter-spacing: 2px; }
 .head.nm-under .nm { display: inline-block; border-bottom: 3px solid var(--namec, var(--accent)); padding-bottom: 2px; }
 .head.nm-boxed .nm { display: inline-block; border: 2px solid var(--namec, var(--accent)); color: var(--namec, var(--accent)); padding: 3px 14px; border-radius: 5px; }
-.head.nm-serif .nm { font-family: Georgia, "Songti SC", "SimSun", serif; font-size: calc(24pt * var(--sf)); letter-spacing: 2px; }
+.head.nm-serif .nm { font-family: var(--titlefont, Georgia, "Songti SC", "SimSun", serif); font-size: calc(24pt * var(--sf)); letter-spacing: 2px; }
+/* 用户显式选了「标题字体」时（app.js 只在选了的情况下才输出 --titlefont），
+   姓名与各类板块标题统一改用它；未选则这些规则不命中，主题原设计（蓝图等宽/杂志衬线）保持不变 */
+.page[style*='--titlefont'] .head .nm,
+.page[style*='--titlefont'] .secu,
+.page[style*='--titlefont'] .secbar,
+.page[style*='--titlefont'] .secnum,
+.page[style*='--titlefont'] .secp,
+.page[style*='--titlefont'] .exphead b { font-family: var(--titlefont); }
 /* 侧栏/横幅头里姓名色不覆盖其白字 */
 .page.layout-sidebar .side .head .nm, .page.layout-banner .band .head .nm { color: #fff; }
 
