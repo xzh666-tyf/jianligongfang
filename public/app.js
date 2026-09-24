@@ -34,7 +34,7 @@ const DEFAULT_THEME = {
   head: 'bar',
   titleStyle: 'bar',
   nameStyle: 'default',
-  skillLevel: 'bar',
+  skillLevel: 'none',   /* ⑦ 默认隐藏熟练度进度条；想显示可在外观面板里选回进度条/文字等级 */
   infoCols: 3,
   nameColor: '', intentColor: '', companyColor: '', roleColor: '', bodyColor: '',
   mask: false,
@@ -149,7 +149,7 @@ function themeObj(t) {
 }
 function applyTheme(r, t) {
   const o = themeObj(t);
-  const full = Object.assign({ secColor: '', tmColor: '', paperBg: '', dark: false, tex: 'none', nameColor: '', intentColor: '', companyColor: '', roleColor: '', bodyColor: '', skillLevel: 'bar', infoCols: 3 }, o);
+  const full = Object.assign({ secColor: '', tmColor: '', paperBg: '', dark: false, tex: 'none', nameColor: '', intentColor: '', companyColor: '', roleColor: '', bodyColor: '', skillLevel: 'none', infoCols: 3 }, o);
   r.theme = { ...r.theme, ...full, hidden: r.theme.hidden || [] };
   r.layout = o.layout;
 }
@@ -195,10 +195,10 @@ const THEME_PRESETS = [
   { name: '藏青·金', accent: '#1f3a5f', secondary: '#b08d4f', secColor: '#1f3a5f', tmColor: '#8d8266', paperBg: '#ffffff', dark: false },
 ];
 const SECTION_TITLES = {
-  base: '基本信息', education: '教育经历', work: '工作经历', campus: '校园经历', projects: '项目经历',
+  base: '基本信息', education: '教育与校园经历', work: '工作经历', campus: '校园经历（并入教育版块）', projects: '项目经历',
   skills: '专业技能', certs: '证书与荣誉', summary: '自我评价', hobbies: '兴趣爱好',
 };
-const EN_TITLES = { 教育经历: 'EDUCATION', 工作经历: 'EXPERIENCE', 校园经历: 'CAMPUS', 项目经历: 'PROJECTS', 专业技能: 'SKILLS', 证书与荣誉: 'CERTIFICATES & HONORS', 自我评价: 'SUMMARY', 兴趣爱好: 'INTERESTS' };
+const EN_TITLES = { 教育经历: 'EDUCATION', 教育与校园经历: 'EDUCATION & CAMPUS', 工作经历: 'EXPERIENCE', 校园经历: 'CAMPUS', 项目经历: 'PROJECTS', 专业技能: 'SKILLS', 证书与荣誉: 'CERTIFICATES & HONORS', 自我评价: 'SUMMARY', 兴趣爱好: 'INTERESTS' };
 /* 章节线性图标（24×24，stroke 描边），按板块 key 取用 */
 const SECTION_ICONS = {
   education: '<path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c0 1 2.5 2.5 5 2.5s5-1.5 5-2.5v-4"/><path d="M21 8v5"/>',
@@ -617,7 +617,7 @@ function renderEditor() {
 
   listBlock('education', '教育经历', null, FIELDS.education, false);
   listBlock('work', '工作经历（倒序，最近一份放最上）', null, FIELDS.work, true);
-  listBlock('campus', '校园经历（学生会 / 社团 / 志愿服务 / 社会实践）', null, FIELDS.campus, false);
+  listBlock('campus', '校园经历（学生会 / 社团 / 志愿服务 / 社会实践）· 打印时并入「教育与校园经历」', null, FIELDS.campus, false);
   listBlock('projects', '项目经历', null, FIELDS.projects, false);
 
   out.push(`<fieldset><legend>专业技能</legend>
@@ -677,7 +677,7 @@ function renderEditor() {
       <label class="toggle" style="margin-left:auto"><input type="checkbox" data-p="#theme.dark" ${r.theme.dark ? 'checked' : ''} /> 暗色纸张</label></div>
     <div class="row"><label>标题样式</label><select class="t" data-p="#theme.titleStyle">${[['underline', '下划线'], ['bar', '色条'], ['icon', '图标标题'], ['leftblock', '左色块'], ['numbered', '编号'], ['centerline', '居中分隔'], ['plain', '纯文字']].map(([k, n]) => `<option value="${k}" ${(r.theme.titleStyle || r.theme.head || 'underline') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <label style="flex:0 0 60px">姓名样式</label><select class="t" data-p="#theme.nameStyle">${[['default', '常规'], ['big', '超大'], ['boxed', '描边框'], ['under', '下划线'], ['serif', '衬线大字']].map(([k, n]) => `<option value="${k}" ${(r.theme.nameStyle || 'default') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-    <div class="row"><label>技能熟练度</label><select class="t" data-p="#theme.skillLevel">${[['bar', '进度条'], ['text', '文字等级'], ['none', '隐藏（只显示技能名）']].map(([k, n]) => `<option value="${k}" ${(r.theme.skillLevel || 'bar') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <div class="row"><label>技能熟练度</label><select class="t" data-p="#theme.skillLevel">${[['none', '隐藏（只显示技能名）'], ['bar', '进度条'], ['text', '文字等级']].map(([k, n]) => `<option value="${k}" ${(r.theme.skillLevel || 'none') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <label style="flex:0 0 66px">信息栏列数</label><select class="t" data-p="#theme.infoCols">${[[2, '两列'], [3, '三列'], [1, '单列']].map(([k, n]) => `<option value="${k}" ${(Number(r.theme.infoCols) || 3) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     <div class="famlabel">文字配色（选填，不填跟随主色）</div>
     <div class="pal2">
@@ -745,9 +745,9 @@ function pageHTML(r, forPrint) {
       ${shownInfo.length ? `<div class="info info-${t.infoCols || 3}">${shownInfo.map((x) => `<div><span class="k">${x[0]}：</span>${esc(x[1])}</div>`).join('')}</div>` : ''}`;
 
   let secNo = 0;
-  const sec = (key, title, inner) => {
+  const sec = (key, title, inner, vis = show(key)) => {
     const body = inner();
-    if (!body || !show(key)) return '';
+    if (!body || !vis) return '';
     secNo++;
     const lb = d.lang === 'en' && EN_TITLES[title] ? EN_TITLES[title] : title;
     const ts = t.titleStyle || t.head || 'underline';
@@ -763,7 +763,15 @@ function pageHTML(r, forPrint) {
   };
   const exp = (o) => `<div class="exphead"><b>${esc(o.company || o.name || '')}</b>${has(o.role) ? `<span class="role">${esc(o.role)}</span>` : ''}<span class="tm">${[o.start, o.end].filter(Boolean).join(' – ')}</span></div>`;
 
-  const edu = () => (d.education || []).map((e) => `${exp(e)}${has(e.note) ? `<div class="infoline">${esc(e.note)}</div>` : ''}`).join('');
+  /* 修 bug：exp() 取的是 o.company || o.name，而教育条目存的是 school/major/degree，
+     直接用 exp() 会渲染出空标题（网页预览与 PDF 里教育经历只剩时间段）。
+     这里显式拼「学校 · 专业 · 学历」，与 lib/docx.js 的 Word 导出保持一致。 */
+  const eduRow = (e) => {
+    const title = [e.school, e.major, e.degree].filter(Boolean).join(' · ') || e.name || e.company || '';
+    const tm = [e.start, e.end].filter(Boolean).join(' – ');
+    return `<div class="exphead"><b>${esc(title)}</b>${tm ? `<span class="tm">${esc(tm)}</span>` : ''}</div>`;
+  };
+  const edu = () => (d.education || []).map((e) => `${eduRow(e)}${has(e.note) ? `<div class="infoline">${esc(e.note)}</div>` : ''}`).join('');
   const item = (o, body) => t.timeline ? `<div class="tl"><div class="node">${exp(o)}${body}</div></div>` : exp(o) + body;
   const work = () => (d.work || []).map((w) => {
     const body = (w.bullets || []).filter(has).length
@@ -772,6 +780,10 @@ function pageHTML(r, forPrint) {
   }).join('');
   const prj = () => (d.projects || []).map((p) => item(p, has(p.desc) ? `<div class="infoline">${esc(p.desc)}</div>` : '')).join('');
   const cam = () => (d.campus || []).map((c) => item(c, has(c.desc) ? `<div class="infoline">${esc(c.desc)}</div>` : '')).join('');
+  /* ② 教育与校园合并为一个版块：数据仍分开存（老简历/导入简历零迁移），
+     两个开关各控制合并块里的对应部分，只有两个都关掉才整块消失 */
+  const eduCam = () => (show('education') ? edu() : '') + (show('campus') ? cam() : '');
+  const eduCamVisible = () => show('education') || show('campus');
   const skl = () => {
     const named = (d.skills || []).filter((s) => has(s.name));
     if (t.ats) {
@@ -788,7 +800,7 @@ function pageHTML(r, forPrint) {
       return (rings ? `<div class="dnutwrap">${rings}</div>` : '') + tags;
     }
     const levelWord = (n) => { n = Math.min(100, Number(n) || 60); return n >= 85 ? '精通' : n >= 70 ? '熟练' : n >= 55 ? '良好' : '了解'; };
-    const sl = t.skillLevel || 'bar';
+    const sl = t.skillLevel || 'none';
     const tags = (d.skillTags || []).filter(has).length ? `<div class="tags" style="margin-top:6px">${d.skillTags.filter(has).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>` : '';
     if (sl === 'none') {
       const names = named.length ? `<div class="tags">${named.map((s) => `<span class="tag">${esc(s.name)}</span>`).join('')}</div>` : '';
@@ -811,9 +823,8 @@ function pageHTML(r, forPrint) {
   const hob = () => (has(d.hobbies) ? `<div class="infoline">${esc(d.hobbies)}</div>` : '');
 
   const main = [
-    sec('education', '教育经历', edu),
+    sec('education', '教育与校园经历', eduCam, eduCamVisible()),
     sec('work', '工作经历', work),
-    sec('campus', '校园经历', cam),
     sec('projects', '项目经历', prj),
     sec('skills', '专业技能', skl),
     sec('certs', '证书与荣誉', cert),
@@ -843,7 +854,7 @@ function pageHTML(r, forPrint) {
       <div class="secu">联系方式</div><div class="sb sb-contact">${shownInfo.map((x) => `<span class="ck">${esc(x[0])}</span><span class="cv">${esc(x[1])}</span>`).join('') || '—'}</div>`;
     return `<div class="${cls}" style="${vars}">
       <div class="side" style="background:${t.accent}">${side}</div>
-      <div class="main">${[sec('education', '教育经历', edu), sec('work', '工作经历', work), sec('campus', '校园经历', cam), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum), sec('hobbies', '兴趣爱好', hob)].join('')}</div></div>`;
+      <div class="main">${[sec('education', '教育与校园经历', eduCam, eduCamVisible()), sec('work', '工作经历', work), sec('projects', '项目经历', prj), sec('certs', '证书与荣誉', cert), sec('summary', '自我评价', sum), sec('hobbies', '兴趣爱好', hob)].join('')}</div></div>`;
   }
   if (t.layout === 'magazine') {
     return `<div class="${cls}" style="${vars}">${head}<div class="rule"></div><div class="body">${main}</div></div>`;
