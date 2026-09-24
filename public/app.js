@@ -1349,22 +1349,38 @@ function bindImport() {
 }
 
 
+let appItems = [];      /* 当前列表，供行内编辑取原记录 */
+let editAppId = null;   /* 正在编辑的记录 id */
+
 async function renderApps() {
   $('#appForm').innerHTML = `<input class="t" id="apCompany" placeholder="公司" />
     <input class="t" id="apPos" placeholder="岗位" list="dl-intent" />
     <input class="t" id="apChan" placeholder="渠道（内推/BOSS/官网）" list="dl-appchan" />
     <input class="t" id="apDate" type="date" />
     <select class="t" id="apStatus">${STATUSES.map((s) => `<option>${s}</option>`).join('')}</select>
+    <input class="t" id="apNote" placeholder="备注（进展 / 联系人 / 下一步）" />
     <button class="btn navy" id="apAdd">记录一次投递</button>`;
   let items = [];
   if (state.me) { try { items = (await API.call('/api/applications')).items || []; } catch (e) { toast(e.message, true); } }
   else items = load('rw.apps', []);
+  appItems = items;
+  const apNote = (a) => `<td class="ap-note">${esc(a.note || '')}</td>`;
+  const apView = (a) => `<tr><td>${esc(a.company)}</td><td>${esc(a.position || '')}</td><td>${esc(a.channel || '')}</td><td>${esc(a.applied_on || '')}</td>
+        <td><span class="pill ${statusCls(a.status)}">${esc(a.status)}</span></td>${apNote(a)}
+        <td style="text-align:right;white-space:nowrap"><button class="mini" data-appedit="${esc(a.id)}">改</button> <button class="del" data-appdel="${esc(a.id)}">删</button></td></tr>`;
+  /* ⑧ 行内编辑：直接把该行变成输入框，保存时回传整行（服务端 PATCH 会覆盖 resume_id/note，不能只传改动字段） */
+  const apEdit = (a) => `<tr class="ap-edit">
+        <td><input class="t" id="ea-company" value="${esc(a.company || '')}" /></td>
+        <td><input class="t" id="ea-position" value="${esc(a.position || '')}" list="dl-intent" /></td>
+        <td><input class="t" id="ea-channel" value="${esc(a.channel || '')}" list="dl-appchan" /></td>
+        <td><input class="t" id="ea-date" type="date" value="${esc(a.applied_on || '')}" /></td>
+        <td><select class="t" id="ea-status">${STATUSES.map((s) => `<option ${s === a.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+        <td><input class="t" id="ea-note" value="${esc(a.note || '')}" placeholder="备注" /></td>
+        <td style="text-align:right;white-space:nowrap"><button class="mini navy" data-appsave="${esc(a.id)}">保存</button> <button class="mini" data-appcancel="1">取消</button></td></tr>`;
   $('#appTable').innerHTML = funnelHTML(items) + (items.length
-    ? `<table class="tr"><tr><th>公司</th><th>岗位</th><th>渠道</th><th>日期</th><th>状态</th><th></th></tr>${items.map((a) =>
-      `<tr><td>${esc(a.company)}</td><td>${esc(a.position || '')}</td><td>${esc(a.channel || '')}</td><td>${esc(a.applied_on || '')}</td>
-        <td><span class="pill ${statusCls(a.status)}">${esc(a.status)}</span></td>
-        <td style="text-align:right"><button class="del" data-appdel="${esc(a.id)}">删</button></td></tr>`).join('')}</table>`
-    : '<p class="hint">记一记投了哪家、什么状态，避免重复投和跟进断档。</p>');
+    ? `<table class="tr"><tr><th>公司</th><th>岗位</th><th>渠道</th><th>日期</th><th>状态</th><th>备注</th><th></th></tr>${items.map((a) =>
+      (editAppId !== null && String(a.id) === String(editAppId) ? apEdit(a) : apView(a))).join('')}</table>`
+    : '<p class="hint">记一记投了哪家、什么状态，避免重复投和跟进断档。点「改」可随时更新进展。</p>');
   $('#appTable').dataset.guest = JSON.stringify(items);
 }
 
@@ -1956,22 +1972,57 @@ function bind() {
   });
   $('#appTable').addEventListener('click', async (e) => {
     const del = e.target.closest('[data-appdel]');
-    if (!del) return;
-    if (state.me) await API.call('/api/applications/' + del.dataset.appdel, { method: 'DELETE' });
-    else localStorage.setItem('rw.apps', JSON.stringify(load('rw.apps', []).filter((x) => x.id !== del.dataset.appdel)));
-    renderApps();
+    if (del) {
+      if (state.me) await API.call('/api/applications/' + del.dataset.appdel, { method: 'DELETE' });
+      else localStorage.setItem('rw.apps', JSON.stringify(load('rw.apps', []).filter((x) => x.id !== del.dataset.appdel)));
+      if (String(editAppId) === String(del.dataset.appdel)) editAppId = null;
+      renderApps();
+      return;
+    }
+    const ed = e.target.closest('[data-appedit]');
+    if (ed) { editAppId = String(ed.dataset.appedit); renderApps(); return; }
+    const cc = e.target.closest('[data-appcancel]');
+    if (cc) { editAppId = null; renderApps(); return; }
+    const sv = e.target.closest('[data-appsave]');
+    if (!sv) return;
+    const id = String(sv.dataset.appsave);
+    const rec = appItems.find((x) => String(x.id) === id) || {};
+    const company = $('#ea-company').value.trim();
+    if (!company) return toast('公司名不能为空', true);
+    const patch = {
+      company,
+      position: $('#ea-position').value.trim(),
+      channel: $('#ea-channel').value.trim(),
+      applied_on: $('#ea-date').value || rec.applied_on || '',
+      status: $('#ea-status').value,
+      note: $('#ea-note').value.trim(),
+      resume_id: rec.resume_id || '',
+    };
+    try {
+      if (state.me) await API.call('/api/applications/' + id, { method: 'PATCH', body: JSON.stringify(patch) });
+      else {
+        const arr = load('rw.apps', []);
+        const i = arr.findIndex((x) => String(x.id) === id);
+        if (i >= 0) arr[i] = { ...arr[i], ...patch };
+        localStorage.setItem('rw.apps', JSON.stringify(arr));
+      }
+      editAppId = null;
+      renderApps();
+      toast('已更新');
+    } catch (err) { toast('保存失败：' + err.message, true); }
   });
   $('#appForm').addEventListener('click', async (e) => {
     if (e.target.id !== 'apAdd') return;
     const item = {
       company: $('#apCompany').value.trim(), position: $('#apPos').value.trim(), channel: $('#apChan').value.trim(),
       applied_on: $('#apDate').value || new Date().toISOString().slice(0, 10), status: $('#apStatus').value,
+      note: $('#apNote').value.trim(),
       resume_id: state.me && curResume() ? curResume().serverId || '' : '',
     };
     if (!item.company) return toast('公司名不能为空', true);
     if (state.me) await API.call('/api/applications', { method: 'POST', body: JSON.stringify(item) });
     else { const arr = load('rw.apps', []); arr.unshift({ ...item, id: uid() }); localStorage.setItem('rw.apps', JSON.stringify(arr)); }
-    ['apCompany', 'apPos', 'apChan'].forEach((k) => ($('#' + k).value = ''));
+    ['apCompany', 'apPos', 'apChan', 'apNote'].forEach((k) => ($('#' + k).value = ''));
     renderApps();
     toast('已记录');
   });
