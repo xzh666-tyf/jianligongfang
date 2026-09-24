@@ -96,8 +96,7 @@ function blocked(key, limit = 12, windowMs = 15 * 60 * 1000) {
 }
 
 async function currentUser(req) {
-  const h = req.headers.authorization || '';
-  const token = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
+  const token = readToken(req);
   if (!token || token.length < 20) return null;
   const hit = sessionCache.get(token);
   if (hit && hit.exp > Date.now()) return hit.user;
@@ -147,6 +146,38 @@ function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers });
   res.end(buf);
 }
+
+/* ② 会话凭证双通道：优先 Authorization: Bearer（老客户端与离线单文件版还在用），其次 HttpOnly cookie。
+   cookie 让 token 不再落 localStorage，XSS 脚本读不到；两种都接受是为了让已登录用户平滑升级不掉线。 */
+const SESS_COOKIE = 'rw_sess';
+function cookieToken(req) {
+  const raw = req.headers.cookie || '';
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i < 0) continue;
+    if (part.slice(0, i).trim() === SESS_COOKIE) return decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return '';
+}
+function readToken(req) {
+  const h = req.headers.authorization || '';
+  if (h.startsWith('Bearer ')) {
+    const t = h.slice(7).trim();
+    if (t) return t;
+  }
+  return cookieToken(req);
+}
+function isHttps(req) {
+  const fwd = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  if (fwd) return fwd === 'https';
+  if (req.socket && req.socket.encrypted) return true;
+  return /^https:/i.test(String(req.headers.referer || ''));
+}
+/* 登录/注册/领匿名号成功后随响应下发；Max-Age 与服务端 SESSION_DAYS 对齐 */
+function authCookie(req, token) {
+  return `${SESS_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${isHttps(req) ? '; Secure' : ''}`;
+}
+const CLEAR_COOKIE = () => `${SESS_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0;
@@ -274,7 +305,7 @@ async function apiGuest(req, res) {
   const u = created && created[0];
   if (!u) return send(res, 500, { error: '游客初始化失败，请稍后重试' });
   const sess = await makeSession(u.id);
-  return send(res, 200, { token: sess.token, user: { id: u.id, username: u.username, role: 'guest' } });
+  return send(res, 200, { token: sess.token, user: { id: u.id, username: u.username, role: 'guest' } }, { 'Set-Cookie': authCookie(req, sess.token) });
 }
 
 async function apiRegister(req, res, body, user) {
@@ -315,7 +346,7 @@ async function apiRegister(req, res, body, user) {
     const u2 = upd && upd[0];
     if (!u2) return send(res, 500, { error: '升级失败，请重试' });
     uid = user.id;
-    token = (req.headers.authorization || '').slice(7).trim();
+    token = readToken(req);
   } else {
     const created = await db('users', {
       method: 'POST', prefer: 'return=representation',
@@ -342,7 +373,7 @@ async function apiRegister(req, res, body, user) {
       imported.push(g.name || '未命名简历');
     }
   }
-  return send(res, 200, { token, user: { id: uid, username, role: targetRole }, restoreCode: restore, imported });
+  return send(res, 200, { token, user: { id: uid, username, role: targetRole }, restoreCode: restore, imported }, { 'Set-Cookie': authCookie(req, token) });
 }
 
 async function apiLogin(req, res, body) {
@@ -368,7 +399,7 @@ async function apiLogin(req, res, body) {
   }
   await db('users', { method: 'PATCH', query: { id: `eq.${u.id}` }, body: { failed_count: 0, locked_until: null } }).catch(() => {});
   const sess = await makeSession(u.id);
-  return send(res, 200, { token: sess.token, user: { id: u.id, username: u.username, role: u.role } });
+  return send(res, 200, { token: sess.token, user: { id: u.id, username: u.username, role: u.role } }, { 'Set-Cookie': authCookie(req, sess.token) });
 }
 
 async function apiReset(req, res, body) {
@@ -838,9 +869,10 @@ async function handleApi(req, res, url, user) {
   if (p === '/api/me') {
     if (req.method === 'GET') return user ? send(res, 200, { user }) : send(res, 401, { error: '未登录' });
     if (req.method === 'POST') {
-      sessionCache.delete((req.headers.authorization || '').slice(7).trim());
-      await db('sessions', { method: 'DELETE', query: { token: `eq.${(req.headers.authorization || '').slice(7).trim()}` } }).catch(() => {});
-      return send(res, 200, { ok: true });
+      const gone = readToken(req);
+      sessionCache.delete(gone);
+      await db('sessions', { method: 'DELETE', query: { token: `eq.${gone}` } }).catch(() => {});
+      return send(res, 200, { ok: true }, { 'Set-Cookie': CLEAR_COOKIE() });
     }
   }
   if (p === '/api/guest' && req.method === 'POST') return apiGuest(req, res);

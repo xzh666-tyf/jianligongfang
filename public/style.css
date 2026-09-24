@@ -362,7 +362,7 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .page.layout-sidebar { display: flex; padding: 0; }
 .page.layout-sidebar .side { width: 62mm; background: var(--accent); color: #fff; padding: 12mm 8mm; }
 .page.layout-sidebar .side .nm { color: #fff; font-size: calc(17pt * var(--sf)); }
-.page.layout-sidebar .side .it { color: rgba(255,255,255,.85); }
+.page.layout-sidebar .side .it { color: rgba(255,255,255,.85); font-size: calc(9.5pt * var(--sf)); line-height: 1.45; margin-top: 4px; text-wrap: pretty; }
 .page.layout-sidebar .side .photo { border-color: rgba(255,255,255,.45); }
 /* 侧栏净宽只有 46mm，头像与姓名并排必然互挤（实测：求职意向断成 3 行、头像被压到 35px 宽且变形）
    → 有头像时（app.js 会加 .hp 类）改为头像居中在上、姓名与求职意向在下 */

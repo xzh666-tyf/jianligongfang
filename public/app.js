@@ -1494,7 +1494,8 @@ function openAuth(tab) {
 }
 async function afterAuth(json) {
   state.token = json.token;
-  localStorage.setItem(LS_TOKEN, json.token);
+  /* ② 注册/登录账号不再把 token 落 localStorage：刷新后靠服务端下发的 HttpOnly cookie 认身份，
+     XSS 偷不到持久凭证。游客匿名账号仍存本地（丢了会重新领一个、身份不连续），见 boot() */
   state.me = json.user;
   state.plan = json.user && (json.user.role === 'user' || json.user.role === 'admin') ? 'pro' : 'guest';
   state.exportLeft = null;
@@ -2234,10 +2235,19 @@ async function boot() {
   if (shareCode) { runShareMode(shareCode); return; }
   bind();
   try {
-    if (!state.token) {
-      try { const gj = await API.call('/api/guest', { method: 'POST' }); state.token = gj.token; localStorage.setItem(LS_TOKEN, gj.token); } catch (e) { /* 领不到匿名账号则退回本地游客 */ }
+    /* ② 先用现有凭证（内存 token 或 HttpOnly cookie）问一次身份，确认没登录才去领匿名号。
+       顺序反了会让注册用户刷新后被当成游客、丢掉身份。 */
+    let bs = await API.call('/api/bootstrap');
+    if (!bs.me) {
+      if (!state.token) {
+        try { const gj = await API.call('/api/guest', { method: 'POST' }); state.token = gj.token; localStorage.setItem(LS_TOKEN, gj.token); } catch (e) { /* 领不到匿名账号则退回本地游客 */ }
+      }
+      bs = await API.call('/api/bootstrap');
+    } else if (localStorage.getItem(LS_TOKEN) && bs.me && bs.me.role !== 'guest') {
+      /* 老版本把注册账号 token 存进了 localStorage；cookie 已能独立认证，清掉这份持久副本（游客不动，避免身份不连续） */
+      localStorage.removeItem(LS_TOKEN);
     }
-    const [bs, full] = await Promise.all([API.call('/api/bootstrap'), API.call('/api/templates')]);
+    const full = await API.call('/api/templates');
     state.me = bs.me || null;
     state.plan = bs.plan || (state.me && (state.me.role === 'user' || state.me.role === 'admin') ? 'pro' : 'guest');
     state.guestExportLimit = bs.guestExportLimit || 3;
