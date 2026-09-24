@@ -1494,8 +1494,11 @@ function openAuth(tab) {
 }
 async function afterAuth(json) {
   state.token = json.token;
-  /* ② 注册/登录账号不再把 token 落 localStorage：刷新后靠服务端下发的 HttpOnly cookie 认身份，
-     XSS 偷不到持久凭证。游客匿名账号仍存本地（丢了会重新领一个、身份不连续），见 boot() */
+  /* ② 注册/登录账号不再把 token 落 localStorage：刷新后靠服务端下发的 HttpOnly cookie 认身份。
+     同时要清掉可能残留的旧副本（例如之前当游客时存的那个）——Bearer 优先级高于 cookie，
+     留着它下次刷新会用旧身份盖掉刚登录的账号（线上实测踩过：登录后仍是游客）。
+     游客匿名号仍存本地，否则每次刷新会重新领一个、身份不连续，见 boot() */
+  localStorage.removeItem(LS_TOKEN);
   state.me = json.user;
   state.plan = json.user && (json.user.role === 'user' || json.user.role === 'admin') ? 'pro' : 'guest';
   state.exportLeft = null;
