@@ -1456,6 +1456,25 @@ async function afterAuth(json) {
 }
 
 /* --------------------------------------------------------------- 导出 */
+/* ④ 导出文件名：优先「简历名称-姓名」。过滤 Windows/macOS 非法字符，
+   简历名为空退回姓名，都为空用「简历」；限长 80 字符避免下载对话框截断 */
+const FN_BAD = /[\\/:*?"<>|\u0000-\u001f]/g;
+function fileBase(r) {
+  const clean = (s) => String(s || '').trim().replace(FN_BAD, '').replace(/\s+/g, ' ');
+  const title = clean(r && r.name).slice(0, 60);   /* 先给简历名限长，留位置给姓名，避免整体截断把姓名吃掉 */
+  const nm = clean(r && r.data && r.data.base && r.data.base.name);
+  const base = nm && nm !== title ? (title ? `${title}-${nm}` : nm) : title;
+  return base.slice(0, 80).trim() || '简历';
+}
+/* PDF 走浏览器打印，Chrome/Edge 的「另存为 PDF」默认文件名取 document.title，
+   所以打印前临时改标题、打完恢复（含分享页那个直接 window.print 的按钮） */
+function printAsPdf(r) {
+  const prev = document.title;
+  if (r) document.title = fileBase(r);
+  window.addEventListener('afterprint', () => { document.title = prev; }, { once: true });
+  setTimeout(() => window.print(), 120);
+}
+
 async function exportAs(kind) {
   const r = curResume();
   if (!r) return toast('先新建一份简历', true);
@@ -1468,8 +1487,8 @@ async function exportAs(kind) {
       renderAcct();
     }
     renderPreview();
-    setTimeout(() => window.print(), 120);
-    return toast('打印窗口里选「另存为 PDF」，纸张 A4、边距默认');
+    printAsPdf(r);
+    return toast(`打印窗口里选「另存为 PDF」，文件名已按「${fileBase(r)}」给出`);
   }
   if (kind === 'json') {
     let apps = [];
@@ -1487,7 +1506,7 @@ async function exportAs(kind) {
       if (!res.ok) { let j = {}; try { j = await res.json(); } catch (e) {} if (j && j.needRegister) { state.exportLeft = 0; renderAcct(); upgradeNudge(j.error || '导出次数已用完，填写邀请码解锁后可不限次数导出'); } else throw new Error((j && j.error) || '导出失败'); }
       else {
         if (res.headers.get('X-Export-Left') != null) { state.exportLeft = Number(res.headers.get('X-Export-Left')); renderAcct(); }
-        download(await res.blob(), `${r.name}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        download(await res.blob(), `${fileBase(r)}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         toast('Word 文件已下载');
       }
     } catch (e) { toast(e.message, true); }
@@ -1499,7 +1518,7 @@ async function exportAs(kind) {
       if (!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
       const el = $('#paper .page');
       const canvas = await window.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      canvas.toBlob((b) => { download(b, `${r.name}.png`, 'image/png'); toast('PNG 已下载'); });
+      canvas.toBlob((b) => { download(b, `${fileBase(r)}.png`, 'image/png'); toast('PNG 已下载'); });
     } catch (e) { toast('图片导出需要加载外部库，当前网络不可用；可改用 PDF 打印', true); }
   }
 }
@@ -2133,6 +2152,8 @@ async function runShareMode(code) {
   main.innerHTML = '<div class="share-gate">正在加载简历…</div>';
   function paint(json) {
     const r = { layout: json.layout || 'default', theme: { ...DEFAULT_THEME, ...(json.theme || {}) }, data: { ...blankData(), ...(json.data || {}) }, name: json.name || '' };
+    /* 分享页是独立视图，标题直接用「简历名称-姓名」，对方点打印存 PDF 时文件名就对了 */
+    document.title = fileBase(r);
     main.innerHTML = `<div class="share-bar"><span>📄 ${esc((r.data.base && r.data.base.name) || '简历')} · 在线简历</span>
       <button class="btn navy" onclick="window.print()">打印 / 存为 PDF</button></div>
       <div class="paper">${pageHTML(r)}</div>`;
