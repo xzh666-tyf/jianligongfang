@@ -304,9 +304,10 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .photo.circle { border-radius: 50%; }
 .rule { height: 3px; background: var(--accent); margin: 9px 0 11px; }
 .rule.thin { height: 1px; background: var(--tagbg); }
-.info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px 10px; font-size: calc(9.5pt * var(--sf)); color: var(--secondary); }
-.info .k { color: #8d97a3; }
-.infoline { margin-top: 5px; font-size: calc(9.5pt * var(--sf)); color: var(--secondary); }
+.info { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px 10px; font-size: calc(9.5pt * var(--sf)); color: var(--secondary); }
+.info > div { min-width: 0; text-wrap: pretty; }
+.info .k { color: #8d97a3; white-space: nowrap; }
+.infoline { margin-top: 5px; font-size: calc(9.5pt * var(--sf)); color: var(--secondary); text-wrap: pretty; }
 .sec { margin-bottom: calc(11px * var(--dens)); }
 .secbar {
   background: var(--sec, var(--accent)); color: #fff; padding: 4px 9px; border-radius: 3px;
@@ -316,12 +317,14 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
   color: var(--sec, var(--accent)); font-size: calc(11.5pt * var(--sf)); font-weight: 700; border-bottom: 1.5px solid var(--sec, var(--accent));
   padding-bottom: 3px; margin-bottom: 8px;
 }
-.exphead { display: flex; align-items: baseline; gap: 8px; margin: calc(7px * var(--dens)) 0 3px; }
+/* ⑩ 经历行：改成「文本流 + 日期右浮」，公司名与职位按普通文字自然换行。
+   原来用 flex 三列并排，公司名一长就和职位互相穿插成 3×3 的乱行（实测截图确认）。 */
+.exphead { display: block; margin: calc(7px * var(--dens)) 0 3px; text-wrap: pretty; }
 .exphead b { font-size: calc(11pt * var(--sf)); }
-.exphead .role { color: var(--secondary); font-size: calc(10pt * var(--sf)); }
-.exphead .tm { margin-left: auto; color: var(--tm, #8d97a3); font-size: calc(9.5pt * var(--sf)); white-space: nowrap; }
+.exphead .role { color: var(--secondary); font-size: calc(10pt * var(--sf)); margin-left: 8px; word-break: keep-all; overflow-wrap: anywhere; }
+.exphead .tm { float: right; margin-left: 10px; color: var(--tm, #8d97a3); font-size: calc(9.5pt * var(--sf)); white-space: nowrap; }
 .ul { margin: 0; padding-left: 15px; }
-.ul li { margin-bottom: 2.5px; }
+.ul li { margin-bottom: 2.5px; text-wrap: pretty; }
 .ul li::marker { color: var(--accent); }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .tag { background: var(--tagbg); color: var(--accent); border-radius: 20px; padding: 1.5px 9px; font-size: calc(9pt * var(--sf)); }
@@ -366,9 +369,12 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .page.layout-sidebar .main { flex: 1; padding: 12mm; }
 /* 侧栏：头部 info 三列网格在窄栏里会竖折且与下方联系方式重复 → 隐藏，统一走联系方式小节 */
 .page.layout-sidebar .side .info { display: none; }
-.sb-contact { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: baseline; }
-.sb-contact .ck { opacity: .72; }
-.sb-contact .cv { word-break: break-word; }
+.sb-contact { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; align-items: baseline; }
+.sb-contact .ck { opacity: .72; white-space: nowrap; }
+.sb-contact .cv { word-break: break-word; overflow-wrap: anywhere; min-width: 0; }
+/* ⑩ 全局：长英文串/邮箱在窄栏里按字符断，不撑破列；正文避免"最后一行只剩一个字"的孤字断行 */
+.page { hyphens: none; }
+.page .sb, .page .tags, .page .skltext { text-wrap: pretty; }
 
 /* ===== 图案型版式：蓝图 / 数据环 / 航线 / 终端 ===== */
 .page { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -502,9 +508,9 @@ input[type=range] { flex: 1; accent-color: var(--navy); height: 26px; }
 .secicon .ln { flex: 1; height: 1.5px; background: linear-gradient(90deg, var(--sec, var(--accent)), transparent); opacity: .45; }
 
 /* ===== 基本信息列数 ===== */
-.info-1 { grid-template-columns: 1fr; }
-.info-2 { grid-template-columns: repeat(2, 1fr); }
-.info-3 { grid-template-columns: repeat(3, 1fr); }
+.info-1 { grid-template-columns: minmax(0, 1fr); }
+.info-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.info-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* ===== 技能·文字等级 ===== */
 .skltext { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px 20px; margin-bottom: 4px; }
